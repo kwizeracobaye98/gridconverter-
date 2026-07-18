@@ -1,0 +1,2639 @@
+ <!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0a0c0a">
+<link rel="manifest" href="./manifest.json">
+<link rel="stylesheet" href="./leaflet.css" />
+<script defer src="./leaflet.js"></script>
+<script defer src="./offline-map-layer.js"></script>
+<title>Rwanda Grid Converter</title>
+<style>
+:root {
+  --bg:      #0a0c0a;
+  --panel:   #0f1410;
+  --border:  #1e3020;
+  --border2: #2a4a30;
+  --accent:  #39ff6a;
+  --accent2: #00c9a7;
+  --dim:     #3a5c40;
+  --text:    #c8e8c8;
+  --muted:   #5a7a5a;
+  --warn:    #ffb830;
+  --err:     #ff4444;
+  --mono:    'Share Tech Mono', monospace;
+  --sans:    'Rajdhani', sans-serif;
+  --glow:    0 0 12px rgba(57,255,106,0.35);
+  --glow2:   0 0 8px rgba(0,201,167,0.3);
+  --nav-h:   64px;
+  --app-max: 1440px;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+
+html,body{
+  height:100%;min-height:100dvh;overflow:hidden;
+  background:var(--bg);color:var(--text);
+  font-family:var(--sans);font-size:15px;
+  touch-action:manipulation;
+}
+
+/* ── SPLASH SCREEN ── */
+.splash-container{
+  position:fixed;inset:0;width:100%;height:100%;min-height:100dvh;
+  background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  z-index:10000;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  opacity:1;transition:opacity .5s ease-out;
+}
+.splash-container.hidden{opacity:0;pointer-events:none}
+.splash-logo{width:160px;height:auto;margin-bottom:20px;object-fit:contain}
+.splash-title{font-size:20px;font-weight:700;color:#207922;margin:0 0 10px;text-align:center;padding:0 20px}
+.splash-subtitle{font-size:14px;color:#226335;margin:0 0 20px;text-align:center;padding:0 20px}
+.splash-version{font-size:12px;color:#226335;margin:0 0 20px;opacity:.7}
+.splash-loader{
+  width:40px;height:40px;border:4px solid rgba(31,107,40,.16);
+  border-top-color:#1f6b28;border-radius:50%;animation:splash-spin 1s linear infinite;
+}
+@keyframes splash-spin{to{transform:rotate(360deg)}}
+
+/* ── LOGIN OVERLAY ── */
+.login-overlay{
+  position:fixed;inset:0;background:linear-gradient(135deg,rgba(0,0,0,.95),rgba(9,14,9,.98));
+  display:flex;align-items:center;justify-content:center;z-index:9999;
+  min-height:100dvh;padding:clamp(1rem,3vw,2rem);
+}
+.login-overlay.hidden{display:none}
+.login-card{
+  width:min(100%,420px);max-width:420px;max-height:calc(100dvh - 2rem);overflow:auto;background:rgba(5,7,4,.95);
+  border:1px solid rgba(57,255,106,.35);border-radius:20px;
+  padding:clamp(22px,4vw,32px) clamp(18px,4vw,24px);display:flex;flex-direction:column;align-items:center;gap:20px;
+  box-shadow:0 0 40px rgba(0,0,0,.7),0 0 80px rgba(57,255,106,.05);
+}
+.login-logo{width:110px;height:auto;filter:drop-shadow(0 0 18px rgba(57,255,106,.7));}
+.login-logo-placeholder{
+  width:110px;height:110px;border:2px solid rgba(57,255,106,.3);border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:10px;color:var(--dim);letter-spacing:1px;text-align:center;
+}
+.login-title{font-family:var(--mono);letter-spacing:2px;text-transform:uppercase;font-size:17px;color:var(--text);text-align:center}
+.login-subtitle{font-family:var(--mono);font-size:11px;color:var(--muted);text-align:center;letter-spacing:1px}
+.login-field{width:100%;display:flex;flex-direction:column;gap:8px;font-family:var(--mono);font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
+.login-field input{
+  border:1px solid rgba(57,255,106,.3);border-radius:10px;background:rgba(10,14,10,.9);
+  color:var(--text);padding:14px 16px;font-family:var(--sans);font-size:16px;letter-spacing:1px;
+  outline:none;transition:border-color .2s;width:100%;
+}
+.login-field input:focus{border-color:var(--accent);box-shadow:var(--glow)}
+.login-btn{
+  align-self:stretch;padding:16px 0;font-family:var(--mono);font-size:12px;letter-spacing:2px;
+  border-radius:10px;background:rgba(57,255,106,.12);border:1px solid var(--accent);
+  color:var(--accent);cursor:pointer;text-transform:uppercase;transition:all .2s;
+}
+.login-btn:active{background:rgba(57,255,106,.25);transform:scale(.98)}
+.login-error{font-family:var(--mono);font-size:11px;color:var(--err);min-height:18px;letter-spacing:.5px;text-align:center}
+.login-copy{font-family:var(--mono);font-size:10px;color:var(--muted);text-align:center;letter-spacing:1px;line-height:1.8}
+
+/* ── APP LAYOUT ── */
+.app{
+  display:flex;flex-direction:column;height:100%;min-height:100dvh;width:min(100%,var(--app-max));margin:0 auto;position:relative;
+  padding-bottom:calc(var(--nav-h) + var(--safe-bottom));
+}
+.connection-chip{
+  display:inline-flex;align-items:center;gap:6px;padding:7px 10px;border-radius:999px;
+  border:1px solid rgba(57,255,106,.25);background:rgba(57,255,106,.08);color:var(--accent2);
+  font-family:var(--mono);font-size:9px;letter-spacing:1px;text-transform:uppercase;
+}
+.connection-chip.offline{
+  border-color:rgba(255,183,72,.35);background:rgba(255,183,72,.12);color:var(--warn);
+}
+.connection-chip .dot{
+  width:7px;height:7px;border-radius:50%;background:currentColor;box-shadow:0 0 8px currentColor;
+}
+.app-header{
+  background:var(--panel);border-bottom:2px solid var(--accent);
+  padding:10px clamp(14px,2vw,24px) 8px;position:relative;flex-shrink:0;
+  background-image:linear-gradient(rgba(57,255,106,.015) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(57,255,106,.015) 1px,transparent 1px);
+  background-size:30px 30px;
+}
+.app-header::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:3px;
+  background:linear-gradient(90deg,var(--accent),var(--accent2),transparent)
+}
+.hdr-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.hdr-actions{display:flex;align-items:center;gap:8px}
+.hdr-title{font-family:var(--mono);font-size:clamp(16px,2vw,20px);color:var(--accent);text-shadow:var(--glow);letter-spacing:clamp(1px,.25vw,2px);text-transform:uppercase}
+.signout-btn{
+  border:1px solid rgba(57,255,106,.28);background:rgba(57,255,106,.06);color:var(--accent2);
+  border-radius:999px;padding:8px 12px;font-family:var(--mono);font-size:10px;letter-spacing:1px;
+  text-transform:uppercase;cursor:pointer;transition:all .2s;white-space:nowrap;
+}
+.signout-btn:active{background:rgba(57,255,106,.16);transform:scale(.98)}
+.hdr-meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.meta-chip{font-family:var(--mono);font-size:clamp(9px,1.2vw,10px);color:var(--dim);border:1px solid var(--border2);padding:4px 8px;border-radius:999px;letter-spacing:.5px}
+.meta-chip span{color:var(--accent2)}
+.hdr-sheet-tag{font-family:var(--mono);font-size:clamp(9px,1.1vw,10px);color:var(--muted);margin-top:6px;letter-spacing:.6px;line-height:1.6;overflow-wrap:anywhere}
+.hdr-sheet-tag span{color:var(--accent2)}
+
+/* ── SHEET SELECTOR ── */
+.sheet-bar{
+  display:flex;background:var(--bg);border-bottom:1px solid var(--border2);
+  flex-shrink:0;overflow-x:auto;-webkit-overflow-scrolling:touch;
+  padding-inline:max(0px,calc((100% - var(--app-max)) / 2));
+}
+.sheet-bar::-webkit-scrollbar{display:none}
+.sheet-btn{
+  flex:1;min-width:70px;padding:9px 6px;background:transparent;border:none;border-right:1px solid var(--border2);
+  color:var(--muted);font-family:var(--mono);font-size:10px;letter-spacing:1px;
+  text-transform:uppercase;cursor:pointer;transition:all .15s;text-align:center;white-space:nowrap;
+}
+.sheet-btn:last-child{border-right:none}
+.sheet-btn.active-sheet{background:rgba(57,255,106,.12);color:var(--accent);text-shadow:var(--glow);border-bottom:2px solid var(--accent)}
+.sheet-badge{display:inline-block;margin-left:3px;font-size:7px;padding:1px 3px;border:1px solid var(--border2);color:var(--dim);vertical-align:middle;border-radius:2px}
+.sheet-badge.anchored{border-color:var(--accent2);color:var(--accent2)}
+
+/* ── SCREEN CONTAINER ── */
+.screen-wrap{flex:1;overflow:hidden;position:relative;min-height:0}
+.screen{
+  position:absolute;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  padding:clamp(14px,2.6vw,24px) clamp(14px,2.6vw,28px) 20px;display:none;
+  background-image:linear-gradient(rgba(57,255,106,.012) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(57,255,106,.012) 1px,transparent 1px);
+  background-size:30px 30px;
+}
+.screen.active{display:block}
+#screen-map{padding:0;overflow:hidden}
+#screen-g2c > *,
+#screen-c2g > *{
+  width:min(100%,960px);
+  margin-left:auto;
+  margin-right:auto;
+}
+
+/* ── FORM ELEMENTS ── */
+.section-label{
+  font-family:var(--mono);font-size:clamp(10px,1.15vw,11px);color:var(--dim);letter-spacing:1.6px;
+  text-transform:uppercase;margin-bottom:8px;padding-bottom:4px;
+  border-bottom:1px solid var(--border);
+}
+.field-group{display:flex;flex-direction:column;gap:10px;margin-bottom:14px}
+.field label{display:block;font-family:var(--mono);font-size:clamp(10px,1.05vw,11px);color:var(--muted);letter-spacing:.9px;text-transform:uppercase;margin-bottom:6px;line-height:1.5}
+.field input{
+  width:100%;border:1px solid var(--border2);border-radius:10px;
+  background:rgba(5,7,4,.8);color:var(--text);
+  padding:10px 10px;font-family:var(--sans);font-size:15px;letter-spacing:.5px;
+  outline:none;transition:border-color .2s,box-shadow .2s;
+  -webkit-appearance:none;appearance:none;
+}
+.field input:focus{border-color:var(--accent);box-shadow:0 0 0 2px rgba(57,255,106,.15)}
+.dms-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;align-items:start}
+
+.mode-toggle{display:flex;gap:0;margin-bottom:14px;border:1px solid var(--border2);border-radius:8px;overflow:hidden}
+.mode-btn{flex:1;padding:10px;font-family:var(--mono);font-size:10px;letter-spacing:1px;background:transparent;border:none;color:var(--muted);cursor:pointer;text-transform:uppercase;transition:all .15s}
+.mode-btn.active{background:rgba(57,255,106,.15);color:var(--accent);text-shadow:var(--glow)}
+.inline-mode-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.inline-mode-bar .mode-btn{border:1px solid var(--border2);border-radius:8px;flex:1 1 180px}
+.inline-mode-bar .mode-btn.active{border-color:var(--accent)}
+.nav-status{
+  background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:10px;
+  padding:12px 14px;margin-top:12px
+}
+.nav-status-title{font-family:var(--mono);font-size:11px;color:var(--accent2);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px}
+.nav-status-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.nav-status-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.nav-status-actions .convert-btn,
+.nav-status-actions .show-map-btn{margin-bottom:0;flex:1 1 200px}
+.nav-chip{
+  display:inline-flex;align-items:center;gap:6px;padding:7px 10px;border-radius:999px;
+  border:1px solid var(--border2);font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.6px
+}
+.nav-chip.live{border-color:var(--accent2);color:var(--accent2)}
+.nav-chip.active{border-color:var(--accent);color:var(--accent)}
+.nav-inline-note{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.4px;line-height:1.6;margin-bottom:12px}
+.floating-nav-bar{
+  position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--nav-h) + var(--safe-bottom) + 8px);
+  width:min(calc(100% - 16px),var(--app-max));z-index:260;display:none;
+  background:rgba(7,10,7,.97);border:1px solid rgba(57,255,106,.24);border-radius:16px;
+  box-shadow:0 16px 36px rgba(0,0,0,.34),0 0 0 1px rgba(57,255,106,.06);backdrop-filter:blur(10px);
+  overflow:hidden
+}
+.floating-nav-bar.show{display:block}
+.floating-nav-head{
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+  padding:12px 14px;background:rgba(57,255,106,.06);border-bottom:1px solid var(--border)
+}
+.floating-nav-title{font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:1.1px;text-transform:uppercase}
+.floating-nav-meta{font-family:var(--mono);font-size:10px;color:var(--accent2);letter-spacing:.5px}
+.floating-nav-toggle{
+  border:1px solid var(--border2);background:transparent;color:var(--muted);border-radius:999px;
+  padding:7px 12px;font-family:var(--mono);font-size:10px;letter-spacing:1px;cursor:pointer
+}
+.floating-nav-body{padding:12px 14px}
+.floating-nav-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.floating-nav-item{background:rgba(0,0,0,.28);border-radius:10px;padding:10px}
+.floating-nav-label{font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:.7px;text-transform:uppercase;margin-bottom:5px}
+.floating-nav-value{font-family:var(--mono);font-size:15px;color:var(--accent);line-height:1.35}
+.floating-nav-item.secondary .floating-nav-value{color:var(--accent2);font-size:13px}
+.floating-nav-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.floating-nav-actions .convert-btn,
+.floating-nav-actions .show-map-btn{margin-bottom:0;flex:1 1 180px}
+.floating-nav-bar.minimized .floating-nav-body{display:none}
+.floating-nav-bar.minimized .floating-nav-head{border-bottom:none}
+
+.convert-btn{
+  width:100%;padding:16px;background:rgba(57,255,106,.1);border:1px solid var(--accent);
+  color:var(--accent);font-family:var(--mono);font-size:12px;letter-spacing:2px;
+  text-transform:uppercase;cursor:pointer;border-radius:12px;
+  transition:all .2s;margin-bottom:10px;text-shadow:var(--glow);
+}
+.convert-btn:active{background:rgba(57,255,106,.25);transform:scale(.98)}
+
+.show-map-btn{
+  width:100%;padding:13px;background:rgba(0,201,167,.08);border:1px solid var(--accent2);
+  color:var(--accent2);font-family:var(--mono);font-size:11px;letter-spacing:2px;
+  text-transform:uppercase;cursor:pointer;border-radius:10px;
+  transition:all .2s;display:none;
+}
+.show-map-btn.visible{display:block}
+.show-map-btn:active{background:rgba(0,201,167,.2)}
+.show-map-btn.inline-action{display:inline-block;width:auto;min-width:180px;margin-bottom:0}
+
+.err-msg{
+  font-family:var(--mono);font-size:11px;color:var(--err);
+  padding:0;max-height:0;overflow:hidden;letter-spacing:.5px;
+  transition:max-height .3s,padding .3s;
+}
+.err-msg.show{max-height:80px;padding:10px 0;border-top:1px solid rgba(255,68,68,.2);margin-bottom:8px}
+
+/* ── RESULT CARD ── */
+.result-card{
+  background:rgba(5,10,5,.8);border:1px solid var(--border2);border-radius:12px;
+  overflow:hidden;max-height:0;opacity:0;
+  transition:max-height .4s ease,opacity .3s ease,border-color .3s;
+  margin-bottom:10px;
+}
+.result-card.show{max-height:600px;opacity:1;border-color:rgba(57,255,106,.3)}
+.result-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 14px;background:rgba(57,255,106,.06);border-bottom:1px solid var(--border);
+  font-family:var(--mono);font-size:clamp(10px,1.05vw,11px);color:var(--dim);letter-spacing:1.2px;text-transform:uppercase;gap:10px;
+}
+.result-precision{font-family:var(--mono);font-size:clamp(10px,1.05vw,11px);color:var(--muted);letter-spacing:.35px;padding:8px 14px 0;line-height:1.6;overflow-wrap:anywhere}
+.result-body{padding:10px 14px 14px}
+.result-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.result-item{background:rgba(0,0,0,.3);border-radius:8px;padding:12px}
+.result-item.gridref{grid-column:1/-1}
+.result-item.dms-output-item{grid-column:1/-1}
+.r-label{font-family:var(--mono);font-size:clamp(10px,1vw,11px);color:var(--muted);letter-spacing:.7px;text-transform:uppercase;margin-bottom:6px;line-height:1.4}
+.r-value{font-family:var(--mono);font-size:clamp(15px,1.6vw,18px);color:var(--accent);word-break:break-word;line-height:1.45}
+.result-item.secondary .r-value{font-size:clamp(13px,1.3vw,15px);color:var(--accent2)}
+.result-item.gridref .r-value{font-size:clamp(20px,2.2vw,28px);letter-spacing:clamp(1px,.4vw,3px)}
+.dms-output-group{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.dms-output-box{display:inline-flex;align-items:baseline;justify-content:center;gap:2px;min-width:50px;padding:6px 8px;border:1px solid rgba(57,255,106,.25);border-radius:8px;background:rgba(0,0,0,.25);font-family:var(--mono);font-size:clamp(12px,1.15vw,14px);color:var(--accent2)}
+.dms-output-box .dms-output-unit{font-size:8px;opacity:.8;color:var(--muted)}
+.dms-output-hemisphere{padding:4px 7px;border:1px solid var(--border2);border-radius:999px;font-family:var(--mono);font-size:9px;letter-spacing:1px;color:var(--muted);text-transform:uppercase}
+
+.copy-btn{
+  font-family:var(--mono);font-size:clamp(10px,1vw,11px);padding:7px 12px;
+  background:rgba(57,255,106,.08);border:1px solid rgba(57,255,106,.3);
+  color:var(--accent2);cursor:pointer;border-radius:5px;letter-spacing:.5px;
+  transition:all .2s;white-space:nowrap;
+}
+.copy-btn:active{background:rgba(57,255,106,.2)}
+.copy-btn.copied{color:var(--accent);border-color:var(--accent)}
+
+.result-actions{padding:0 14px 14px;display:flex;gap:8px;flex-wrap:wrap}
+.result-map-link{
+  padding:10px 14px;font-family:var(--mono);font-size:clamp(10px,1vw,11px);letter-spacing:.8px;
+  border:1px solid var(--accent2);color:var(--accent2);text-decoration:none;
+  border-radius:7px;transition:all .2s;display:inline-block;text-align:center;
+}
+.result-map-link:active{background:rgba(0,201,167,.15)}
+.result-action-stack{padding:0 14px 14px;display:flex;gap:8px;flex-wrap:wrap}
+.result-action-stack .result-map-link,
+.result-action-stack .show-map-btn{flex:1 1 220px;text-align:center}
+
+.steps-toggle{
+  width:100%;padding:11px;font-family:var(--mono);font-size:10px;letter-spacing:2px;
+  background:transparent;border:1px solid var(--border2);border-radius:8px;
+  color:var(--muted);cursor:pointer;text-transform:uppercase;margin-bottom:8px;
+  display:flex;align-items:center;justify-content:center;gap:8px;transition:all .2s;
+}
+.steps-toggle.open{color:var(--accent2);border-color:var(--accent2)}
+.steps-toggle::after{content:'▼';font-size:9px;transition:transform .2s}
+.steps-toggle.open::after{transform:rotate(180deg)}
+.steps-box{
+  font-family:var(--mono);font-size:11px;color:var(--muted);line-height:1.7;
+  background:rgba(0,0,0,.4);border:1px solid var(--border);border-radius:8px;
+  max-height:0;overflow:hidden;letter-spacing:.3px;
+  transition:max-height .35s,padding .3s;
+}
+.steps-box.show{max-height:600px;padding:12px 14px;margin-bottom:10px}
+
+.sep{border:none;border-top:1px solid var(--border);margin:16px 0}
+
+/* ── SHEET INFO ── */
+.sheet-info{background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:10px;padding:14px}
+.info-title{font-family:var(--mono);font-size:clamp(10px,1.1vw,11px);color:var(--dim);letter-spacing:1px;text-transform:uppercase;margin-bottom:12px;line-height:1.5}
+.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.info-item{background:rgba(5,7,4,.6);border-radius:6px;padding:8px}
+.i-label{font-family:var(--mono);font-size:clamp(9px,.95vw,10px);color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin-bottom:4px;line-height:1.4}
+.i-val{font-family:var(--mono);font-size:clamp(11px,1.15vw,12px);color:var(--text);line-height:1.6;overflow-wrap:anywhere}
+.i-val.accent{color:var(--accent2)}
+
+/* ── MAP SCREEN ── */
+#screen-map{
+  display:none;position:relative;overflow:hidden;background:#050705;
+  flex-direction:column;min-height:100%;height:100%;
+}
+#screen-map.active{display:flex}
+
+.map-toolbar{
+  position:absolute;top:16px;right:12px;left:auto;z-index:460;
+  display:flex;align-items:flex-end;justify-content:flex-end;gap:10px;pointer-events:none;
+  flex-wrap:wrap;
+}
+.map-tool-group{
+  display:flex;gap:8px;flex-wrap:wrap;max-width:min(72vw,520px);pointer-events:auto;
+  align-items:center;
+}
+.map-tool-group.secondary{justify-content:flex-end;margin-left:auto}
+.map-icon-btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;min-width:46px;min-height:42px;
+  background:rgba(7,10,7,.88);border:1px solid rgba(57,255,106,.18);color:var(--muted);
+  font-family:var(--mono);font-size:9px;padding:10px 12px;cursor:pointer;
+  letter-spacing:.9px;text-transform:uppercase;transition:all .15s;border-radius:14px;white-space:nowrap;
+  box-shadow:0 10px 22px rgba(0,0,0,.24);backdrop-filter:blur(10px);
+}
+.map-btn-icon{font-size:15px;line-height:1}
+.map-btn-text{font-size:9px;line-height:1}
+.map-icon-btn:hover,.map-icon-btn:active{border-color:var(--accent2);color:var(--accent2)}
+.map-icon-btn.active-layer{border-color:var(--accent);color:var(--accent);background:rgba(57,255,106,.07)}
+.map-locate-btn{border-color:var(--accent2);color:var(--accent2)}
+.map-ruler-btn.active-layer{border-color:#00c4ff;color:#00c4ff;background:rgba(0,196,255,.08)}
+.map-ruler-output{
+  position:absolute;bottom:128px;left:50%;transform:translateX(-50%);z-index:430;width:auto;max-width:min(calc(100% - 32px),360px);
+  font-family:var(--mono);font-size:10px;color:var(--accent2);letter-spacing:1px;text-align:center;
+  padding:8px 14px;border:1px solid rgba(57,255,106,.14);border-radius:999px;background:rgba(5,7,4,.88);
+  backdrop-filter:blur(10px);
+}
+#screen-compass{
+  display:none;position:relative;overflow:auto;background:
+    radial-gradient(circle at top,rgba(255,198,70,.08),transparent 28%),
+    linear-gradient(180deg,#050607 0%,#0b0d0b 55%,#11130f 100%);
+  padding:18px 14px 92px;
+  -webkit-overflow-scrolling:touch;
+  touch-action:auto;
+}
+#screen-compass.active{display:block}
+.compass-container{
+  display:flex;flex-direction:column;gap:18px;max-width:620px;margin:0 auto;min-height:100%;padding-bottom:24px;
+}
+.compass-device{
+  background:linear-gradient(180deg,#7f7b69 0%,#6f6a58 18%,#555244 58%,#433f34 100%);
+  border-radius:34px;padding:18px 16px 20px;border:1px solid rgba(255,245,202,.18);
+  box-shadow:0 28px 70px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.16);
+  overflow:visible;
+}
+.compass-device-top{
+  background:linear-gradient(180deg,#3b3d36 0%,#232520 100%);border-radius:18px;padding:12px 14px 14px;
+  border:1px solid rgba(255,232,163,.12);box-shadow:inset 0 1px 0 rgba(255,255,255,.06);
+}
+.compass-device-title{font-family:var(--mono);font-size:clamp(15px,2.2vw,20px);color:#e0bc45;letter-spacing:.6px;text-align:center;text-transform:uppercase}
+.compass-device-subtitle{font-family:var(--sans);font-size:clamp(12px,1.7vw,15px);color:#d7d0b1;text-align:center;opacity:.88;margin-top:2px}
+.compass-objective-grid{
+  margin-top:10px;background:#050607;border-radius:10px;border:1px solid rgba(255,232,163,.12);
+  padding:10px 12px;font-family:var(--mono);font-size:clamp(18px,3vw,26px);color:#f5c83f;letter-spacing:2px;text-align:center;
+}
+.compass-objective-coords{
+  margin-top:8px;background:#050607;border-radius:10px;border:1px solid rgba(255,232,163,.12);
+  padding:10px 12px;font-family:var(--mono);font-size:clamp(12px,1.9vw,15px);color:#e6e0c7;line-height:1.65;text-align:center;
+}
+.compass-compass-wrapper{
+  display:flex;justify-content:center;align-items:center;padding:16px 0 8px;
+}
+.compass-svg{width:min(100%,400px);height:auto;display:block;filter:drop-shadow(0 18px 36px rgba(0,0,0,.26));}
+#compass-needle-group,
+#compass-bearing-line,
+#compass-dial-group{
+  transition:transform .3s ease-out;
+  transform-origin:center center;
+  transform-box:view-box;
+  visibility:visible;
+}
+#compass-bearing-line{opacity:.78;}
+#compass-needle-group path{filter:drop-shadow(0 0 18px rgba(255,210,69,.28));}
+.compass-cardinal,.compass-intercardinal{font-family:var(--mono);fill:#2c7eab;letter-spacing:1px;opacity:.92;}
+.compass-marks line{stroke:rgba(35,42,46,.45);stroke-width:1;}
+.compass-marks line.major{stroke:rgba(24,30,33,.8);stroke-width:1.6;}
+.compass-marks text{font-family:var(--mono);fill:#171b1d;font-size:10px}
+.compass-device-bottom{
+  display:grid;grid-template-columns:1fr;gap:10px;margin-top:10px;
+}
+.compass-metric-panel,
+.compass-live-panel{
+  background:#050607;border-radius:12px;border:1px solid rgba(255,232,163,.12);padding:12px;
+}
+.compass-metric-label,
+.compass-live-label{
+  font-family:var(--mono);font-size:10px;color:#b59f63;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;
+}
+.compass-metric-value{
+  font-family:var(--mono);font-size:clamp(24px,5vw,40px);color:#f4c53f;letter-spacing:1px;line-height:1.1;text-align:center;
+}
+.compass-live-value{
+  font-family:var(--mono);font-size:clamp(11px,1.75vw,14px);color:#d7d0b1;line-height:1.6;text-align:center;
+}
+.compass-info-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;}
+.compass-info-item{
+  background:rgba(8,11,8,.92);border:1px solid rgba(212,177,76,.14);border-radius:20px;padding:16px;
+}
+.compass-info-label{font-family:var(--mono);font-size:10px;color:#baaf82;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;}
+.compass-info-value{font-family:var(--mono);font-size:15px;color:#f4f0dc;line-height:1.4;}
+.compass-footer{display:flex;flex-direction:column;align-items:center;gap:12px;padding:14px 12px 0;}
+.compass-message{font-family:var(--mono);font-size:12px;color:#d7d0b1;text-align:center;line-height:1.6;}
+.compass-actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;}
+#compass-enable-btn{
+  padding:12px 18px;border-radius:14px;background:rgba(244,197,63,.13);border:1px solid rgba(244,197,63,.32);
+  color:#f4c53f;box-shadow:0 14px 30px rgba(244,197,63,.06);
+}
+#compass-end-nav-btn{padding:12px 18px;border-radius:14px;background:rgba(255,68,68,.16);border:1px solid rgba(255,68,68,.28);color:#ffb2b2;box-shadow:0 14px 30px rgba(255,68,68,.08);}
+#compass-end-nav-btn:hover{background:rgba(255,68,68,.24);}
+.compass-no-nav{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:28px 18px;
+  background:rgba(0,0,0,.4);border:1px solid rgba(212,177,76,.12);border-radius:26px;color:#c2b892;text-align:center;
+}
+@media(max-width:720px){
+  .compass-info-grid{grid-template-columns:1fr;}
+  .compass-container{max-width:520px}
+  .compass-device{padding:14px 10px 16px;border-radius:26px}
+  .compass-device-top{padding:10px 10px 12px}
+  .compass-compass-wrapper{padding:12px 0 6px}
+  .compass-svg{width:min(100%,320px)}
+}
+
+#tactical-map{
+  position:relative;flex:1 1 auto;min-height:100%;
+  width:100%;background:#060a06;
+}
+
+/* ── MAP LAYERS & COORDS BAR ── */
+.map-layers-coords{
+  position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:430;
+  width:min(calc(100% - 32px),500px);display:flex;flex-direction:column;gap:8px;
+}
+.map-layers-group{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;}
+.map-layers-group button{padding:7px 10px;font-size:8px;border-radius:8px;min-width:50px}
+.map-search-bar{
+  display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;
+}
+.map-search-input{
+  width:100%;border:1px solid rgba(57,255,106,.18);border-radius:14px;background:rgba(7,10,7,.72);
+  color:var(--text);padding:11px 12px;font-family:var(--mono);font-size:11px;letter-spacing:.45px;outline:none;
+  backdrop-filter:blur(10px);box-shadow:0 10px 22px rgba(0,0,0,.18);
+}
+.map-search-input:focus{border-color:var(--accent2);box-shadow:0 0 0 2px rgba(0,201,167,.14)}
+.map-search-btn{
+  border:1px solid rgba(0,201,167,.34);background:rgba(7,10,7,.72);color:var(--accent2);border-radius:14px;
+  padding:11px 14px;font-family:var(--mono);font-size:10px;letter-spacing:1px;text-transform:uppercase;cursor:pointer;white-space:nowrap;
+  backdrop-filter:blur(10px);box-shadow:0 10px 22px rgba(0,0,0,.18);
+}
+.map-search-hint{
+  font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:.4px;line-height:1.5;text-align:center;
+}
+.map-coords-display{
+  font-family:var(--mono);font-size:10px;color:var(--accent);letter-spacing:.5px;
+  text-align:center;line-height:1.6;display:grid;grid-template-columns:1fr 1fr;gap:8px;
+}
+.map-coords-item{background:rgba(0,0,0,.2);padding:8px;border-radius:6px}
+.map-coords-label{font-size:8px;color:var(--muted);text-transform:uppercase;margin-bottom:3px}
+.map-coords-value{font-size:11px;color:var(--accent2);word-break:break-word}
+/* Left vertical tool column */
+.map-side-tools{
+  position:absolute;left:12px;top:50%;transform:translateY(-50%);z-index:470;display:flex;flex-direction:column;gap:8px;pointer-events:auto;
+}
+.map-side-tools .map-icon-btn{min-width:48px;padding:10px 12px;border-radius:10px;display:flex;align-items:center;gap:8px}
+
+#screen-map.sidebar-open .map-layers-coords{left:50%}
+
+@media(min-width:768px){
+  #screen-map.sidebar-open .map-layers-coords{
+    left:auto;right:calc(16px + min(360px, calc(100% - 32px)) + 12px);transform:none;
+  }
+}
+
+/* ── MAP INFO BAR ── */
+.map-info-bar{
+  display:none;position:absolute;left:12px;right:12px;bottom:92px;z-index:420;
+  background:rgba(5,7,4,.95);border:1px solid rgba(57,255,106,.16);border-radius:18px;
+  padding:10px 12px;flex-wrap:wrap;gap:8px;overflow-x:auto;backdrop-filter:blur(12px);
+  box-shadow:0 14px 30px rgba(0,0,0,.28);
+}
+.map-info-bar.show{display:flex}
+.mib-item{min-width:110px;flex:1 1 110px}
+.mib-label{font-family:var(--mono);font-size:clamp(9px,.95vw,10px);color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin-bottom:3px;line-height:1.4}
+.mib-val{font-family:var(--mono);font-size:clamp(12px,1.15vw,13px);color:var(--accent);line-height:1.5;overflow-wrap:anywhere}
+.mib-val.secondary{color:var(--accent2);font-size:clamp(11px,1.05vw,12px)}
+.map-nav-card{
+  position:absolute;left:50%;transform:translateX(-50%);right:auto;top:auto;bottom:92px;width:calc(100% - 32px);max-width:620px;z-index:420;
+  background:rgba(7,10,7,.95);border:1px solid rgba(57,255,106,.16);border-radius:18px;
+  box-shadow:0 14px 30px rgba(0,0,0,.28);padding:10px;display:none;touch-action:manipulation;
+  backdrop-filter:blur(12px)
+}
+.map-nav-card.show{display:block}
+.map-nav-card.minimized .map-nav-grid,.map-nav-card.minimized .map-nav-actions{display:none}
+.map-nav-card.minimized{width:calc(100% - 24px);max-width:520px;left:12px;right:auto;padding:6px 10px}
+.map-nav-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+.map-nav-card.minimized .map-nav-head{margin-bottom:0}
+.map-nav-title{font-family:var(--mono);font-size:10px;color:var(--accent);letter-spacing:.9px;text-transform:uppercase}
+.map-nav-sub{font-family:var(--mono);font-size:8px;color:var(--accent2);letter-spacing:.4px;line-height:1.4;margin-top:2px}
+.map-nav-toggle{
+  border:1px solid var(--border2);background:transparent;color:var(--muted);border-radius:999px;
+  padding:4px 8px;font-family:var(--mono);font-size:9px;letter-spacing:.8px;cursor:pointer
+}
+.map-nav-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.map-nav-grid .result-item{padding:8px}
+.map-nav-grid .r-value{font-size:13px;line-height:1.25}
+.map-nav-grid .r-label{font-size:9px;margin-bottom:4px}
+.map-nav-grid .result-item.objective{grid-column:1/-1}
+.map-nav-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.map-nav-btn{
+  flex:1 1 calc(50% - 3px);border-radius:8px;padding:9px 8px;font-family:var(--mono);font-size:9px;
+  letter-spacing:1px;text-transform:uppercase;cursor:pointer
+}
+.map-nav-btn.start{background:rgba(57,255,106,.1);border:1px solid var(--accent);color:var(--accent)}
+.map-nav-btn.end{background:rgba(0,201,167,.08);border:1px solid var(--accent2);color:var(--accent2)}
+.map-screen:fullscreen .map-nav-card,
+.map-screen:-ms-fullscreen .map-nav-card,
+.map-screen:-webkit-full-screen .map-nav-card{right:16px;top:144px;left:auto;bottom:auto;transform:none;z-index:1000}
+
+/* ── HISTORY / PIN PANEL (bottom sheet on small screens, sidebar on larger screens) ── */
+.pin-sheet{
+  position:fixed;left:12px;right:12px;bottom:12px;
+  background:var(--panel);border:1px solid rgba(57,255,106,.16);border-radius:18px;
+  max-height:46vh;min-height:220px;z-index:550;display:none;flex-direction:column;
+  width:auto;max-width:calc(100% - 24px);backdrop-filter:blur(10px);
+  box-shadow:0 18px 36px rgba(0,0,0,.35);transform:translateY(100%);
+  transition:transform .25s cubic-bezier(.4,0,.2,1);
+}
+.pin-sheet.open{display:flex;transform:translateY(0)}
+.pin-sheet-handle{
+  padding:12px 14px;display:flex;align-items:center;justify-content:space-between;
+  cursor:pointer;flex-shrink:0;border-bottom:1px solid var(--border);
+}
+.pin-sheet-drag{width:3px;height:32px;background:var(--border2);border-radius:2px;margin:0 auto 0 0}
+.pin-sheet-title{font-family:var(--mono);font-size:10px;color:var(--accent2);letter-spacing:1px;text-transform:uppercase}
+.pin-sheet-count{font-family:var(--mono);font-size:8px;color:var(--muted)}
+.pin-actions{display:flex;gap:4px;padding:8px 10px;flex-shrink:0;overflow-x:auto;border-bottom:1px solid var(--border);flex-wrap:wrap;order:2}
+.history-list{order:1;overflow-y:auto;padding:8px 10px}
+.pin-actions::-webkit-scrollbar{display:none}
+.pin-actions button{
+  white-space:nowrap;font-family:var(--mono);font-size:clamp(8px,.9vw,9px);letter-spacing:.6px;
+  padding:6px 8px;background:rgba(57,255,106,.06);border:1px solid var(--border2);
+  color:var(--muted);cursor:pointer;border-radius:5px;text-transform:uppercase;transition:all .15s;flex-shrink:0;
+}
+.pin-actions .btn-route{border-color:var(--accent2);color:var(--accent2)}
+.pin-actions .btn-report{border-color:var(--warn);color:var(--warn)}
+.pin-actions .btn-clear{border-color:var(--err);color:var(--err)}
+.history-list{flex:1;overflow-y:auto;padding:8px 10px}
+.history-list::-webkit-scrollbar{width:3px}
+.history-list::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+.history-item{
+  background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:8px;
+  padding:12px;margin-bottom:8px;cursor:pointer;transition:border-color .15s;
+  display:flex;flex-direction:column;
+}
+
+.history-item.active-pin{border-color:var(--accent);background:rgba(57,255,106,.05)}
+.history-item:active{background:rgba(57,255,106,.08)}
+.hi-top{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.hi-num{font-family:var(--mono);font-size:10px;color:var(--accent2);background:rgba(0,201,167,.1);border:1px solid rgba(0,201,167,.3);border-radius:4px;padding:2px 6px;flex-shrink:0}
+.hi-grid{font-family:var(--mono);font-size:clamp(14px,1.4vw,16px);color:var(--accent);flex:1;letter-spacing:1px;overflow-wrap:anywhere}
+.hi-src{font-family:var(--mono);font-size:9px;color:var(--dim);padding:2px 5px;border:1px solid var(--border);border-radius:3px}
+.hi-del{background:none;border:none;color:var(--err);font-size:16px;cursor:pointer;padding:0 4px;line-height:1;flex-shrink:0}
+.hi-name{font-family:var(--mono);font-size:clamp(11px,1.05vw,12px);color:var(--text);margin-bottom:6px;line-height:1.5}
+.hi-dms{font-family:var(--mono);font-size:clamp(10px,.95vw,11px);color:var(--muted);letter-spacing:.2px;line-height:1.6;overflow-wrap:anywhere;margin-bottom:6px}
+
+.hi-distance{font-family:var(--mono);font-size:9px;padding:2px 6px;border-radius:4px;margin-top:4px;display:inline-block}
+.hi-distance.delta{background:rgba(0,201,167,.1);color:var(--accent2);border:1px solid rgba(0,201,167,.2)}
+.hi-route-check{display:flex;align-items:center;gap:5px;font-family:var(--mono);font-size:9px;color:var(--muted);cursor:pointer;margin-top:4px}
+.hi-route-check input{accent-color:var(--accent);width:13px;height:13px}
+.no-pins{font-family:var(--mono);font-size:11px;color:var(--muted);text-align:center;padding:24px 16px;letter-spacing:.5px;line-height:1.7}
+
+/* ── BOTTOM NAV ── */
+.bottom-nav{
+  position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:min(100%,var(--app-max));
+  height:calc(var(--nav-h) + var(--safe-bottom));
+  padding:0 6px var(--safe-bottom);
+  background:rgba(10,12,10,.97);border-top:2px solid var(--border2);
+  display:flex;gap:6px;backdrop-filter:blur(10px);
+  z-index:200;
+}
+.app.map-focus,
+.app.compass-focus{padding-bottom:calc(54px + var(--safe-bottom))}
+.app.map-focus .auth-banner,
+.app.map-focus .app-header,
+.app.map-focus .sheet-bar,
+.app.compass-focus .auth-banner,
+.app.compass-focus .app-header,
+.app.compass-focus .sheet-bar{
+  max-height:0;opacity:0;overflow:hidden;pointer-events:none;border-width:0;padding-top:0;padding-bottom:0;
+}
+.app.map-focus .bottom-nav,
+.app.compass-focus .bottom-nav{
+  width:auto;min-width:220px;bottom:10px;height:auto;padding:6px 8px calc(6px + var(--safe-bottom));
+  border:1px solid rgba(57,255,106,.18);border-radius:20px;background:rgba(7,10,7,.88);
+  box-shadow:0 16px 30px rgba(0,0,0,.32);
+}
+.app.map-focus .nav-btn,
+.app.compass-focus .nav-btn{
+  min-width:48px;min-height:44px;padding:8px;border-radius:12px;
+}
+.app.map-focus .nav-btn span:last-child,
+.app.compass-focus .nav-btn span:last-child{display:none}
+.nav-btn{
+  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:4px;background:rgba(57,255,106,.04);border:1px solid transparent;cursor:pointer;padding:8px 4px;
+  font-family:var(--mono);font-size:clamp(9px,.95vw,11px);letter-spacing:.5px;text-transform:uppercase;
+  color:var(--muted);transition:all .15s;border-radius:14px;min-height:56px;line-height:1.2;text-align:center;
+}
+.nav-btn.active{color:var(--accent);text-shadow:var(--glow);background:rgba(57,255,106,.12);border-color:rgba(57,255,106,.25);box-shadow:inset 0 0 0 1px rgba(57,255,106,.08)}
+.nav-icon{font-size:clamp(18px,1.9vw,22px);line-height:1}
+.nav-btn.active .nav-icon{filter:drop-shadow(0 0 6px rgba(57,255,106,.8))}
+
+/* ── HINT CARD ── */
+.hint-card{
+  background:rgba(5,7,4,.9);border:1px solid var(--border2);border-radius:10px;
+  padding:10px 14px;font-family:var(--mono);font-size:10px;color:var(--muted);
+  line-height:1.6;letter-spacing:.5px;margin-bottom:12px;
+}
+.hint-card strong{color:var(--accent2);font-size:11px;display:block;margin-bottom:4px;letter-spacing:1px}
+
+/* ── TAC MARKERS ── */
+.tac-marker{width:28px;height:28px;position:relative}
+.tac-dot{width:10px;height:10px;background:#39ff6a;border-radius:50%;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);box-shadow:0 0 12px #39ff6a;animation:pd 1.5s infinite}
+.tac-ring{width:28px;height:28px;border:1.5px solid #39ff6a;border-radius:50%;position:absolute;top:0;left:0;opacity:.5;animation:pr 1.5s infinite}
+.tac-old .tac-dot{background:#00c9a7;box-shadow:0 0 8px #00c9a7;animation:none}
+.tac-old .tac-ring{border-color:#00c9a7;animation:none;opacity:.3}
+.tac-cal .tac-dot{background:#ffb830;box-shadow:0 0 8px #ffb830;animation:none;width:8px;height:8px}
+.tac-cal .tac-ring{border-color:#ffb830;animation:none;opacity:.4}
+@keyframes pd{0%,100%{opacity:1}50%{opacity:.6}}
+@keyframes pr{0%{transform:scale(.7);opacity:.6}100%{transform:scale(1.3);opacity:0}}
+
+.grid-label{font-family:'Share Tech Mono',monospace;font-size:9px;color:#fff;opacity:.55;background:transparent;border:none;white-space:nowrap;font-weight:500;text-shadow:0 0 3px #000,0 0 6px #000}
+.leaflet-popup-content-wrapper{background:rgba(8,12,8,.95);border:1px solid rgba(57,255,106,.25);border-radius:10px;box-shadow:0 0 20px rgba(0,0,0,.5)}
+.leaflet-popup-content{margin:10px 12px;font-family:'Share Tech Mono',monospace;font-size:11px;color:#c8e8c8;letter-spacing:.3px}
+.leaflet-popup-tip{background:rgba(8,12,8,.95)}
+.popup-actions{margin-top:8px;display:flex;gap:5px;flex-wrap:wrap}
+.popup-actions button{border:none;border-radius:4px;padding:5px 9px;font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:.6px;background:rgba(57,255,106,.1);color:#00c9a7;cursor:pointer}
+.popup-actions button.delete{background:rgba(255,68,68,.1);color:#ff4444}
+.ruler-tooltip{background:rgba(0,0,0,.8);border:none;border-radius:4px;color:#fff;padding:4px 8px;font-size:11px}
+
+/* ── ACCURACY NOTE ── */
+.accuracy-note{
+  padding:8px 12px;background:rgba(57,255,106,.03);border:1px solid var(--border2);
+  border-left:3px solid var(--accent2);border-radius:0 6px 6px 0;
+  font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:.4px;
+  line-height:1.7;margin-top:8px;
+}
+.accuracy-note b{color:var(--accent2)}
+
+.auth-banner{
+  background:rgba(57,255,106,.06);border-bottom:1px solid rgba(57,255,106,.2);
+  padding:9px 14px;font-family:var(--mono);font-size:10px;color:var(--accent2);
+  letter-spacing:1px;text-transform:uppercase;text-align:center;flex-shrink:0;
+}
+
+@media(min-width:600px){
+  .result-grid{grid-template-columns:1fr 1fr}
+  .dms-row{grid-template-columns:1fr 1fr 1.2fr}
+  .map-toolbar{flex-wrap:wrap}
+  .map-tool-group{max-width:calc(50% - 10px)}
+  .map-tool-group.secondary{margin-left:0;flex-basis:100%;margin-top:4px}
+}
+
+@media(max-width:420px){
+  .splash-title{font-size:16px}
+  .splash-subtitle{font-size:14px}
+  .splash-logo{width:120px}
+  .hdr-row{flex-direction:column;align-items:flex-start}
+  .hdr-actions{width:100%;justify-content:space-between}
+  .hdr-title{font-size:15px;letter-spacing:1px}
+  .hdr-sheet-tag{line-height:1.5}
+  .result-header{flex-wrap:wrap}
+  .result-grid,
+  .info-grid,
+  .nav-status-grid,
+  .floating-nav-grid{grid-template-columns:1fr}
+  .dms-row{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+  .result-item.gridref{grid-column:1}
+  .result-item.gridref .r-value{font-size:18px;letter-spacing:2px}
+  .bottom-nav{padding-inline:4px;gap:4px}
+  .nav-btn{min-height:54px;padding:7px 2px;font-size:9px}
+  .nav-icon{font-size:18px}
+  .map-toolbar{top:8px;left:8px;right:8px;flex-direction:column;gap:8px;align-items:stretch}
+  .map-tool-group{gap:6px;max-width:100%;flex:1 1 auto;justify-content:center;flex-wrap:wrap}
+  .map-tool-group.secondary{justify-content:center;margin-left:0;flex-wrap:wrap}
+  .map-icon-btn{padding:10px 8px;border-radius:10px;min-width:auto;flex:1 1 calc(33.333% - 5px);min-height:38px;font-size:8px;gap:4px}
+  .map-search-bar{grid-template-columns:1fr}
+  .map-search-btn{width:100%}
+  .map-btn-text{display:none}
+  .map-btn-icon{font-size:14px}
+  .mib-item{min-width:calc(50% - 8px);flex-basis:calc(50% - 8px)}
+  .map-nav-card{right:8px;bottom:calc(12px + var(--nav-h) + var(--safe-bottom));width:clamp(140px,45vw,170px)}
+  .map-side-tools{left:8px;top:8px;gap:6px}
+  .map-side-tools .map-icon-btn{min-width:auto;padding:10px 10px;font-size:9px;justify-content:center}
+  .map-ruler-output{bottom:128px;font-size:9px}
+  .map-info-bar{bottom:80px;left:8px;right:8px}
+  .map-side-tools{left:8px;top:50%;transform:translateY(-50%);gap:6px}
+  .map-side-tools .map-icon-btn{min-width:auto;padding:10px 10px;font-size:9px;justify-content:center}
+  .pin-sheet{left:8px;right:8px;bottom:calc(12px + var(--nav-h) + var(--safe-bottom));max-height:50vh;min-height:180px;border-radius:16px;display:none;transform:translateY(100%)}
+  .pin-sheet.open{display:flex;transform:translateY(0)}
+}
+
+@media(min-width:768px){
+  .login-card{max-width:460px}
+  #screen-g2c > *,
+  #screen-c2g > *{width:min(100%,1040px)}
+  .info-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .pin-sheet{
+    left:auto;right:16px;top:88px;bottom:16px;
+    width:min(360px,calc(100% - 32px));max-width:360px;
+    max-height:calc(100vh - 120px);min-height:220px;
+    transform:translateX(100%);
+  }
+  .pin-sheet.open{transform:translateX(0)}
+  .floating-nav-bar{width:min(calc(100% - 32px),var(--app-max));bottom:calc(var(--nav-h) + var(--safe-bottom) + 12px)}
+}
+
+@media(min-width:1024px){
+  body{background:
+    radial-gradient(circle at top,rgba(57,255,106,.08),transparent 35%),
+    linear-gradient(180deg,#091009 0%,#050705 100%);
+  }
+  .app{box-shadow:0 0 0 1px rgba(57,255,106,.08),0 20px 70px rgba(0,0,0,.35)}
+  #screen-g2c > *,
+  #screen-c2g > *{width:min(100%,1120px)}
+  #dec-inputs .field-group{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+  .result-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .info-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .map-info-bar{left:16px;right:auto;width:min(520px,calc(100% - 420px))}
+  .map-icon-btn{min-width:52px}
+  .map-toolbar{flex-wrap:nowrap;gap:12px}
+  .map-tool-group{max-width:none;gap:10px}
+  .map-tool-group.secondary{margin-left:auto;flex-basis:auto}
+  .floating-nav-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+}
+</style>
+</head>
+<body>
+
+<!-- SPLASH SCREEN -->
+<div id="splash-screen" class="splash-container" aria-label="Loading Grid Converter">
+  <img decoding="async" src="Picture1.png" alt="Logo" class="splash-logo">
+  <h1 class="splash-title">Converter App</h1>
+  <p class="splash-subtitle">©RMA GAKO 2026</p>
+  <p class="splash-version">v1.0.0</p>
+  <div class="splash-loader" aria-hidden="true"></div>
+</div>
+
+<!-- LOGIN OVERLAY -->
+<div class="login-overlay" id="login-overlay">
+  <div class="login-card">
+    <img src="image.png" alt="© KWIZERA JP GAKO 2026" class="login-logo" onerror="this.onerror=null;this.style.display='none';document.getElementById('logo-placeholder').style.display='flex'">
+    <div class="login-logo-placeholder" id="logo-placeholder" style="display:none">ASRAT<br>GROUP<br>GAKO</div>
+    <div class="login-title">Grid Converter</div>
+    <div class="login-subtitle">Authenticate to unlock</div>
+    <label class="login-field">
+      <span>Password</span>
+      <input type="password" id="login-password" autocomplete="current-password" placeholder="Enter password" inputmode="text">
+    </label>
+    <button class="login-btn" id="login-submit" type="button">▶ UNLOCK</button>
+    <div class="login-error" id="login-message"></div>
+    <div class="login-copy">© KWIZERA JP GAKO 2026<br>Help line: Kwizera - 0781845528<br>Copyright© 2026 · All rights reserved.</div>
+  </div>
+</div>
+
+<!-- APP -->
+<div class="app" id="app" style="display:none">
+  <!-- AUTH BANNER -->
+  <div class="auth-banner" id="auth-banner" style="display:none">🔓 Access granted · © KWIZERA JP GAKO 2026</div>
+
+  <!-- HEADER -->
+  <div class="app-header">
+    <div class="hdr-row">
+      <div class="hdr-title">⊕ Grid Converter</div>
+      <div class="hdr-actions">
+        <div class="connection-chip" id="connection-chip" title="Connection status"><span class="dot"></span><span id="connection-state">Online</span></div>
+        <div style="font-family:var(--mono);font-size:9px;color:var(--muted)">Multi-Sheet · WGS84</div>
+        <button class="signout-btn" id="signout-btn" type="button">Sign Out</button>
+      </div>
+    </div>
+    <div class="hdr-meta">
+      <div class="meta-chip">1:50K</div>
+      <div class="meta-chip">WGS84</div>
+      <div class="meta-chip">TM CM=30°E</div>
+      <div class="meta-chip">Acc <span>&lt;1m</span></div>
+    </div>
+    <div class="hdr-sheet-tag">Sheet: <span id="hdr-sheet-name">GAKO</span> &nbsp;|&nbsp; <span id="hdr-anchor-note" style="font-size:8px">Anchor: 201515 ↔ 02°14'49.319"S / 30°10'50.464"E</span><br><span id="topo-ref-note" style="font-size:8px;color:var(--muted)">Topo ref: <span id="topo-ref-dms"></span></span></div>
+  </div>
+
+  <!-- SHEET SELECTOR -->
+  <div class="sheet-bar" id="sheet-selector-bar">
+    <button class="sheet-btn active-sheet" onclick="selectSheet('gako')" id="sbtn-gako">GAKO<span class="sheet-badge anchored">GPS</span></button>
+    <button class="sheet-btn" onclick="selectSheet('gabiro')" id="sbtn-gabiro">GABIRO<span class="sheet-badge anchored">REF</span></button>
+    <button class="sheet-btn" onclick="selectSheet('mihindi')" id="sbtn-mihindi">MIHINDI<span class="sheet-badge anchored">REF</span></button>
+    <button class="sheet-btn" onclick="selectSheet('nyagatare')" id="sbtn-nyagatare">NYAGATARE<span class="sheet-badge anchored">REF</span></button>
+  </div>
+
+  <!-- SCREENS -->
+  <div class="screen-wrap">
+
+    <!-- SCREEN: Grid → Geo -->
+    <div class="screen active" id="screen-g2c">
+      <div class="section-label">Input · 6-Figure Grid Reference</div>
+      <div class="field-group">
+        <div class="field">
+          <label>Grid Reference (6 digits)</label>
+          <input type="text" id="grid-input" inputmode="numeric" maxlength="6" placeholder="e.g. 201515" oninput="this.value=this.value.replace(/\D/g,'');clearErr('g2c')">
+        </div>
+      </div>
+      <button class="convert-btn" onclick="convertGrid()">▶ CONVERT GRID</button>
+      <button class="show-map-btn" id="g2c-map-btn" onclick="goToMap()">⊕ SHOW ON MAP</button>
+      <div class="err-msg" id="g2c-err"></div>
+      <div class="result-card" id="g2c-result">
+        <div class="result-header">
+          <span>WGS84 COORDINATES</span>
+          <button class="copy-btn" id="g2c-copy" onclick="copyResult('g2c')">⧉ COPY</button>
+        </div>
+        <div class="result-precision" id="g2c-prec"></div>
+        <div class="result-body">
+          <div class="result-grid">
+            <div class="result-item dms-output-item"><div class="r-label">Latitude (DMS)</div><div class="r-value" id="out-lat-dms">—</div></div>
+            <div class="result-item dms-output-item"><div class="r-label">Longitude (DMS)</div><div class="r-value" id="out-lon-dms">—</div></div>
+            <div class="result-item secondary"><div class="r-label">Latitude (Decimal°)</div><div class="r-value" id="out-lat-dec">—</div></div>
+            <div class="result-item secondary"><div class="r-label">Longitude (Decimal°)</div><div class="r-value" id="out-lon-dec">—</div></div>
+            <div class="result-item secondary"><div class="r-label">Distance</div><div class="r-value" id="out-distance">—</div></div>
+          </div>
+        </div>
+        <div class="result-actions">
+          <a class="result-map-link" id="g2c-google-link" href="#" target="_blank" rel="noopener">🗺 Google Maps</a>
+        </div>
+      </div>
+      <button class="steps-toggle" id="g2c-steps-btn" onclick="toggleSteps('g2c')" style="display:none">Calculation Steps</button>
+      <div class="steps-box" id="g2c-steps"></div>
+      <hr class="sep">
+      <div class="sheet-info">
+        <div class="info-title">// <span id="sheet-info-name">GAKO</span> · Active Sheet Constants</div>
+        <div class="info-grid">
+          <div class="info-item"><div class="i-label">Sheet</div><div class="i-val accent" id="sheet-info-name2">GAKO</div></div>
+          <div class="info-item"><div class="i-label">Projection</div><div class="i-val">Trans. Mercator</div></div>
+          <div class="info-item"><div class="i-label">Base Easting</div><div class="i-val accent" id="sheet-info-baseE">499990.3318 m</div></div>
+          <div class="info-item"><div class="i-label">Base Northing</div><div class="i-val accent" id="sheet-info-baseN">9700132.8125 m</div></div>
+          <div class="info-item"><div class="i-label">Grid E</div><div class="i-val"><span id="sheet-info-gEmin">0</span>–<span id="sheet-info-gEmax">330</span></div></div>
+          <div class="info-item"><div class="i-label">Grid N</div><div class="i-val"><span id="sheet-info-gNmin">418</span>–<span id="sheet-info-gNmax">790</span></div></div>
+          <div class="info-item" style="grid-column:1/-1">
+            <div class="i-label">Calibration Anchor</div>
+            <div class="i-val accent" id="sheet-info-anchor" style="font-size:9px;line-height:1.5">Anchor: 201515 ↔ 02°14'49.319"S / 30°10'50.464"E · error &lt; 0.03 m</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SCREEN: Geo → Grid -->
+    <div class="screen" id="screen-c2g">
+      <div class="section-label">Input Mode</div>
+      <div class="mode-toggle">
+        <button class="mode-btn" id="mode-dec" onclick="setMode('dec')">Decimal °</button>
+        <button class="mode-btn active" id="mode-dms" onclick="setMode('dms')">DMS</button>
+      </div>
+
+      <div id="dec-inputs" style="display:none">
+        <div class="section-label">Decimal Degrees Input</div>
+        <div class="field-group">
+          <div class="field">
+            <label>Latitude (°S, positive value)</label>
+            <input type="number" id="dec-lat" inputmode="decimal" step="0.00001" placeholder="e.g. 1.523144" oninput="clearErr('c2g')">
+          </div>
+          <div class="field">
+            <label>Longitude (°E)</label>
+            <input type="number" id="dec-lon" inputmode="decimal" step="0.00001" placeholder="e.g. 30.414050" oninput="clearErr('c2g')">
+          </div>
+        </div>
+        <div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-bottom:12px;letter-spacing:.5px">Enter latitude as positive South value · e.g. 1.523144 = 01°31'23.3"S</div>
+      </div>
+
+      <div id="dms-inputs" style="display:block">
+        <div class="section-label">Latitude (S)</div>
+        <div class="field-group">
+          <div class="dms-row">
+            <div class="field"><label>Degrees</label><input type="number" id="dms-lat-d" inputmode="numeric" placeholder="01" min="0" max="89" oninput="clearErr('c2g')"></div>
+            <div class="field"><label>Minutes</label><input type="number" id="dms-lat-m" inputmode="numeric" placeholder="31" min="0" max="59" oninput="clearErr('c2g')"></div>
+            <div class="field"><label>Seconds</label><input type="number" id="dms-lat-s" inputmode="decimal" placeholder="23.32" step="0.001" oninput="clearErr('c2g')"></div>
+          </div>
+        </div>
+        <div class="section-label">Longitude (E)</div>
+        <div class="field-group">
+          <div class="dms-row">
+            <div class="field"><label>Degrees</label><input type="number" id="dms-lon-d" inputmode="numeric" placeholder="30" min="0" max="179" oninput="clearErr('c2g')"></div>
+            <div class="field"><label>Minutes</label><input type="number" id="dms-lon-m" inputmode="numeric" placeholder="24" min="0" max="59" oninput="clearErr('c2g')"></div>
+            <div class="field"><label>Seconds</label><input type="number" id="dms-lon-s" inputmode="decimal" placeholder="50.58" step="0.001" oninput="clearErr('c2g')"></div>
+          </div>
+        </div>
+      </div>
+
+      <button class="convert-btn" onclick="convertGeo()">▶ CONVERT COORDINATES</button>
+      <button class="show-map-btn" id="c2g-map-btn" onclick="goToMap()">⊕ SHOW ON MAP</button>
+      <div class="err-msg" id="c2g-err"></div>
+      <div class="result-card" id="c2g-result">
+        <div class="result-header">
+          <span>6-FIGURE GRID REF</span>
+          <button class="copy-btn" id="c2g-copy" onclick="copyResult('c2g')">⧉ COPY</button>
+        </div>
+        <div class="result-precision" id="c2g-prec"></div>
+        <div class="result-body">
+          <div class="result-grid">
+            <div class="result-item gridref"><div class="r-label">Grid Reference</div><div class="r-value" id="out-gridref">——————</div></div>
+            <div class="result-item secondary"><div class="r-label">TM Easting (m)</div><div class="r-value" id="out-tm-e">—</div></div>
+            <div class="result-item secondary"><div class="r-label">TM Northing (m)</div><div class="r-value" id="out-tm-n">—</div></div>
+            <div class="result-item secondary"><div class="r-label">Raw gE</div><div class="r-value" id="out-ge-raw">—</div></div>
+            <div class="result-item secondary"><div class="r-label">Raw gN</div><div class="r-value" id="out-gn-raw">—</div></div>
+          </div>
+        </div>
+        <div class="result-actions">
+          <a class="result-map-link" id="c2g-google-link" href="#" target="_blank" rel="noopener">🗺 Google Maps</a>
+        </div>
+      </div>
+      <button class="steps-toggle" id="c2g-steps-btn" onclick="toggleSteps('c2g')" style="display:none">Calculation Steps</button>
+      <div class="steps-box" id="c2g-steps"></div>
+    </div>
+
+    <!-- SCREEN: Map -->
+    <div class="screen map-screen" id="screen-map">
+      <div class="map-layers-coords">
+        <div class="map-search-bar">
+          <input
+            type="text"
+            id="map-search-input"
+            class="map-search-input"
+            placeholder="Search grid or DMS, e.g. 201515 or 02 14 49.319 S, 30 10 50.464 E"
+            aria-label="Search grid reference or DMS coordinates">
+          <button class="map-search-btn" type="button" onclick="searchMapPoint()">Search</button>
+        </div>
+        <div class="map-search-hint">Search by 6-digit grid or DMS pair</div>
+        <div class="map-layers-group">
+          <button class="map-icon-btn active-layer" id="btn-layer-osm" onclick="setLayer('osm')" title="Street map">
+            <span class="map-btn-icon">🗺</span><span class="map-btn-text">Street</span>
+          </button>
+          <button class="map-icon-btn" id="btn-layer-sat" onclick="setLayer('sat')" title="Satellite map">
+            <span class="map-btn-icon">🛰</span><span class="map-btn-text">Sat</span>
+          </button>
+          <button class="map-icon-btn" id="btn-layer-topo" onclick="setLayer('topo')" title="Topographic map">
+            <span class="map-btn-icon">▦</span><span class="map-btn-text">Topo</span>
+          </button>
+          <button class="map-icon-btn" id="btn-grid-toggle" onclick="toggleGridLines()" title="Toggle grid overlay">
+            <span class="map-btn-icon">#</span><span class="map-btn-text">Grid On</span>
+          </button>
+        </div>
+      </div>
+      <!-- Left vertical tool column (non-overlapping) -->
+      <div class="map-side-tools" id="map-side-tools" aria-hidden="false">
+        <button class="map-icon-btn" onclick="fitSheet()" title="Fit active sheet">
+          <span class="map-btn-icon">⌖</span><span class="map-btn-text">Sheet</span>
+        </button>
+        <button class="map-icon-btn" id="btn-map-fullscreen" onclick="toggleMapFullscreen()" title="Toggle fullscreen map">
+          <span class="map-btn-icon">⛶</span><span class="map-btn-text">Full</span>
+        </button>
+        <button class="map-icon-btn map-locate-btn" id="btn-locate" onclick="ensureUserLocation({quiet:false,centerOnFound:true,zoom:15})" title="Center on my location">
+          <span class="map-btn-icon">⊙</span><span class="map-btn-text">Me</span>
+        </button>
+        <button class="map-icon-btn map-ruler-btn" id="btn-ruler" onclick="toggleRuler()" title="Measure from live location">
+          <span class="map-btn-icon">📏</span><span class="map-btn-text">Ruler</span>
+        </button>
+        <button class="map-icon-btn" id="btn-map-info" onclick="toggleMapInfoBar()" title="Show or hide info">
+          <span class="map-btn-icon">ℹ</span><span class="map-btn-text">Info</span>
+        </button>
+        <button class="map-icon-btn" id="btn-pin-sheet" onclick="togglePinSheet()" title="Show or hide pin cards">
+          <span class="map-btn-icon">📍</span><span class="map-btn-text">Pins</span>
+        </button>
+        <button class="map-icon-btn" id="btn-map-nav" onclick="toggleMapNavCard()" title="Show or hide navigation card">
+          <span class="map-btn-icon">🧭</span><span class="map-btn-text">Nav</span>
+        </button>
+
+      </div>
+
+      <!-- Permission hint (appears when location is blocked) -->
+      <div id="map-perm-hint" style="position:absolute;left:14px;bottom:14px;z-index:450;display:none;padding:8px 10px;border-radius:10px;background:rgba(7,10,7,.95);border:1px solid rgba(255,183,48,.18);color:#ffb830;font-family:var(--mono);font-size:11px;letter-spacing:.6px">
+        <span id="map-perm-text">Location access is blocked. Enable to use live location.</span>
+        <button id="map-perm-action" style="margin-left:8px;padding:6px 8px;border-radius:8px;background:transparent;border:1px solid rgba(255,183,48,.15);color:#ffb830;font-family:var(--mono);font-size:11px;cursor:pointer">Enable</button>
+      </div>
+
+      <div class="map-toolbar">
+        <div class="map-tool-group secondary"></div>
+      </div>
+      <div id="ruler-output" class="map-ruler-output" style="display:none">Ruler off</div>
+      <div id="tactical-map" style="flex:1;min-height:0"></div>
+      <div class="map-nav-card minimized" id="map-nav-card">
+        <div class="map-nav-head">
+          <div>
+            <div class="map-nav-title">Nav</div>
+            <div class="map-nav-sub" id="map-nav-sub">No active route built yet.</div>
+          </div>
+          <button class="map-nav-toggle" id="map-nav-toggle" onclick="toggleMapNavCard()">▶</button>
+        </div>
+        <div class="map-nav-grid">
+          <div class="result-item secondary"><div class="r-label">Remaining</div><div class="r-value" id="map-nav-distance">—</div></div>
+          <div class="result-item secondary"><div class="r-label">Time</div><div class="r-value" id="map-nav-time">—</div></div>
+          <div class="result-item secondary objective"><div class="r-label">Objective</div><div class="r-value" id="map-nav-objective">—</div></div>
+        </div>
+        <div class="map-nav-actions">
+          <button class="map-nav-btn start" id="map-nav-start-btn" onclick="startNavigation()">Start</button>
+          <button class="map-nav-btn end" id="map-nav-end-btn" onclick="endNavigation()">End</button>
+        </div>
+      </div>
+      <div class="map-info-bar" id="map-info-bar">
+        <div class="mib-item"><div class="mib-label">Grid Ref</div><div class="mib-val" id="mib-grid">—</div></div>
+        <div class="mib-item"><div class="mib-label">Latitude</div><div class="mib-val" id="mib-lat">—</div></div>
+        <div class="mib-item"><div class="mib-label">Longitude</div><div class="mib-val" id="mib-lon">—</div></div>
+        <div class="mib-item"><div class="mib-label">TM-E</div><div class="mib-val secondary" id="mib-tme">—</div></div>
+        <div class="mib-item"><div class="mib-label">TM-N</div><div class="mib-val secondary" id="mib-tmn">—</div></div>
+        <div class="mib-item"><div class="mib-label">Distance</div><div class="mib-val secondary" id="mib-distance">—</div></div>
+      </div>
+      <!-- Pin Bottom Sheet -->
+      <div class="pin-sheet" id="pin-sheet">
+        <div class="pin-sheet-handle" onclick="togglePinSheet()">
+          <div style="flex:1">
+            <div class="pin-sheet-drag" style="margin:0 0 6px"></div>
+            <div style="display:flex;align-items:center;justify-content:space-between">
+              <div class="pin-sheet-title">📍 Pins <span class="pin-sheet-count" id="pin-count">(0)</span></div>
+              <div style="font-family:var(--mono);font-size:9px;color:var(--dim)" id="pin-sheet-chevron">▲ Expand</div>
+            </div>
+          </div>
+        </div>
+        <div class="pin-actions">
+          <button class="btn-route" onclick="createRoute()">🛣 Route</button>
+          <button class="btn-report" onclick="generateReport()">📄 Report</button>
+          <button onclick="toggleRoutesVisibility()" id="btn-route-toggle">Hide Routes</button>
+          <button class="btn-clear" onclick="clearHistory()">✕ Clear</button>
+        </div>
+        <div class="history-list" id="history-list">
+          <div class="no-pins">No pins yet · tap the map to add pins.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SCREEN: Grid → Grid Nav -->
+    <div class="screen" id="screen-g2g">
+      <div class="section-label">Grid To Grid Navigation</div>
+      <div class="hint-card">
+        <strong>Route workflow</strong>
+        Choose whether navigation starts from your live location or from a manual start grid. The app computes bearing, distance, estimated time, and lets you start or end navigation.
+      </div>
+      <div class="section-label">Start Source</div>
+      <div class="inline-mode-bar">
+        <button class="mode-btn active" id="nav-start-mode-live" onclick="setNavStartMode('live')">Current Location</button>
+        <button class="mode-btn" id="nav-start-mode-grid" onclick="setNavStartMode('grid')">Manual Grid</button>
+      </div>
+      <div class="nav-inline-note" id="nav-live-note">Live start uses your phone GPS as the origin and keeps the navigation leg updated while you move.</div>
+      <div class="field-group">
+        <div class="field" id="nav-start-grid-wrap" style="display:none">
+          <label>Start Grid (6 digits)</label>
+          <input type="text" id="nav-grid-start" inputmode="numeric" maxlength="6" placeholder="e.g. 201515" oninput="this.value=this.value.replace(/\D/g,'');clearErr('g2g')">
+        </div>
+        <div class="field">
+          <label>Destination Grid (6 digits)</label>
+          <input type="text" id="nav-grid-end" inputmode="numeric" maxlength="6" placeholder="e.g. 288612" oninput="this.value=this.value.replace(/\D/g,'');clearErr('g2g')">
+        </div>
+      </div>
+      <div class="section-label">Travel Mode</div>
+      <div class="inline-mode-bar">
+        <button class="mode-btn active" id="nav-travel-foot" onclick="setNavTravelMode('foot')">Foot</button>
+        <button class="mode-btn" id="nav-travel-vehicle" onclick="setNavTravelMode('vehicle')">Vehicle</button>
+      </div>
+      <button class="convert-btn" onclick="convertGridToGrid()">▶ BUILD NAVIGATION LEG</button>
+      <div class="err-msg" id="g2g-err"></div>
+      <div class="result-card" id="g2g-result">
+        <div class="result-header">
+          <span>Grid Navigation Solution</span>
+          <button class="copy-btn" id="g2g-copy" onclick="copyResult('g2g')">⧉ COPY</button>
+        </div>
+        <div class="result-precision" id="g2g-prec"></div>
+        <div class="result-body">
+          <div class="result-grid">
+            <div class="result-item"><div class="r-label">Start Sheet / Grid</div><div class="r-value" id="g2g-start">—</div></div>
+            <div class="result-item"><div class="r-label">Destination Sheet / Grid</div><div class="r-value" id="g2g-end">—</div></div>
+            <div class="result-item secondary"><div class="r-label">Start Coordinates</div><div class="r-value" id="g2g-start-coords">—</div></div>
+            <div class="result-item secondary"><div class="r-label">Destination Coordinates</div><div class="r-value" id="g2g-end-coords">—</div></div>
+            <div class="result-item"><div class="r-label">Distance</div><div class="r-value" id="g2g-distance">—</div></div>
+            <div class="result-item"><div class="r-label">Estimated Time</div><div class="r-value" id="g2g-eta">—</div></div>
+            <div class="result-item"><div class="r-label">Bearing</div><div class="r-value" id="g2g-bearing">—</div></div>
+            <div class="result-item secondary"><div class="r-label">Back Bearing</div><div class="r-value" id="g2g-back-bearing">—</div></div>
+            <div class="result-item secondary"><div class="r-label">Movement Vector</div><div class="r-value" id="g2g-vector">—</div></div>
+          </div>
+        </div>
+        <div class="result-action-stack">
+          <button class="convert-btn" id="nav-start-btn" onclick="startNavigation()">▶ START NAVIGATION</button>
+          <button class="show-map-btn visible inline-action" id="nav-end-btn" onclick="endNavigation()" style="display:inline-block">■ END NAVIGATION</button>
+          <a class="result-map-link" id="g2g-google-link" href="#" target="_blank" rel="noopener">🗺 Google Maps Route</a>
+          <button class="show-map-btn inline-action" id="g2g-map-btn" onclick="showGridNavigationOnMap()">⊕ SHOW LEG ON MAP</button>
+        </div>
+        <div class="nav-status">
+          <div class="nav-status-title">Active Navigation</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+            <span class="nav-chip" id="nav-chip-state">Idle</span>
+            <span class="nav-chip" id="nav-chip-source">Start: Current location</span>
+            <span class="nav-chip" id="nav-chip-travel">Mode: Foot</span>
+          </div>
+          <div class="nav-status-grid">
+            <div class="result-item"><div class="r-label">Remaining Distance</div><div class="r-value" id="nav-remaining-distance">—</div></div>
+            <div class="result-item"><div class="r-label">Remaining Time</div><div class="r-value" id="nav-remaining-time">—</div></div>
+            <div class="result-item secondary"><div class="r-label">Current Bearing</div><div class="r-value" id="nav-current-bearing">—</div></div>
+            <div class="result-item secondary"><div class="r-label">Elapsed</div><div class="r-value" id="nav-elapsed">—</div></div>
+          </div>
+        </div>
+      </div>
+      <button class="steps-toggle" id="g2g-steps-btn" onclick="toggleSteps('g2g')" style="display:none">Calculation Steps</button>
+      <div class="steps-box" id="g2g-steps"></div>
+    </div>
+
+    <!-- SCREEN: Compass -->
+    <div class="screen" id="screen-compass">
+      <div class="compass-container">
+        <div class="compass-device">
+          <div class="compass-device-top">
+            <div class="compass-device-title" id="compass-objective-title">Name pending</div>
+            <div class="compass-device-subtitle" id="compass-objective-subtitle">Objective</div>
+            <div class="compass-objective-grid" id="compass-destination">—</div>
+            <div class="compass-objective-coords" id="compass-destination-coords">—</div>
+          </div>
+
+          <div class="compass-compass-wrapper">
+            <svg class="compass-svg" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <radialGradient id="compassRingFill" cx="50%" cy="50%" r="50%">
+                  <stop offset="0%" stop-color="#f7f3da"/>
+                  <stop offset="78%" stop-color="#f2eed5"/>
+                  <stop offset="100%" stop-color="#b5b19d"/>
+                </radialGradient>
+              </defs>
+              <circle cx="150" cy="150" r="146" fill="#6d6f68" stroke="#4b4e49" stroke-width="4"/>
+              <circle cx="150" cy="150" r="134" fill="url(#compassRingFill)" stroke="#d8d2ba" stroke-width="2"/>
+              <circle cx="150" cy="150" r="105" fill="#050607" stroke="#8f8973" stroke-width="5"/>
+
+              <g id="compass-dial-group">
+                <g id="compass-degree-marks" class="compass-marks"></g>
+                <text x="150" y="28" text-anchor="middle" class="compass-cardinal" font-size="24" fill="#b6403d">N</text>
+                <text x="272" y="157" text-anchor="middle" class="compass-cardinal" font-size="22">E</text>
+                <text x="150" y="286" text-anchor="middle" class="compass-cardinal" font-size="22">S</text>
+                <text x="28" y="157" text-anchor="middle" class="compass-cardinal" font-size="22">W</text>
+                <text x="236" y="66" text-anchor="middle" class="compass-intercardinal" font-size="15">NE</text>
+                <text x="236" y="246" text-anchor="middle" class="compass-intercardinal" font-size="15">SE</text>
+                <text x="64" y="246" text-anchor="middle" class="compass-intercardinal" font-size="15">SW</text>
+                <text x="64" y="66" text-anchor="middle" class="compass-intercardinal" font-size="15">NW</text>
+              </g>
+
+              <line id="compass-bearing-line" x1="150" y1="150" x2="150" y2="48" stroke="rgba(244,197,63,.5)" stroke-width="3" stroke-dasharray="6 6" stroke-linecap="round"/>
+
+              <g id="compass-needle-group">
+                <path d="M150 62 L194 154 L166 149 L177 242 L150 229 L123 242 L134 149 L106 154 Z" fill="#d9b437" stroke="#f3db82" stroke-width="2"/>
+              </g>
+
+              <circle cx="150" cy="150" r="9" fill="#d9b437" stroke="#f4e4a3" stroke-width="3"/>
+            </svg>
+          </div>
+
+          <div class="compass-device-bottom">
+            <div class="compass-metric-panel">
+              <div class="compass-metric-label">Remaining Distance</div>
+              <div class="compass-metric-value" id="compass-remaining">—</div>
+            </div>
+            <div class="compass-live-panel">
+              <div class="compass-live-label">Live Position</div>
+              <div class="compass-live-value" id="compass-live-coords">Waiting for location…</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="compass-nav-info">
+          <div class="compass-info-grid">
+            <div class="compass-info-item">
+              <div class="compass-info-label">Route Distance</div>
+              <div class="compass-info-value" id="compass-distance">—</div>
+            </div>
+            <div class="compass-info-item">
+              <div class="compass-info-label">ETA</div>
+              <div class="compass-info-value" id="compass-eta">—</div>
+            </div>
+            <div class="compass-info-item">
+              <div class="compass-info-label">Target DMS</div>
+              <div class="compass-info-value" id="compass-target-dms">—</div>
+            </div>
+            <div class="compass-info-item">
+              <div class="compass-info-label">Live Grid</div>
+              <div class="compass-info-value" id="compass-live-grid">—</div>
+            </div>
+            <div class="compass-info-item">
+              <div class="compass-info-label">Sensor</div>
+              <div class="compass-info-value" id="compass-sensor-state">Waiting</div>
+            </div>
+          </div>
+        </div>
+        <div class="compass-footer">
+          <div class="compass-message" id="compass-message">Turn until the arrow points straight up, then keep moving.</div>
+          <div class="compass-actions">
+            <button class="show-map-btn visible inline-action" id="compass-rename-btn" onclick="renameCompassObjective()" style="display:inline-block">✎ RENAME PIN</button>
+            <button class="convert-btn" id="compass-enable-btn" onclick="requestCompassAccess()">◎ ENABLE COMPASS</button>
+            <button class="convert-btn" id="compass-end-nav-btn" onclick="endNavigation()" style="display:none">■ END NAVIGATION</button>
+          </div>
+        </div>
+        <div class="compass-no-nav" id="compass-no-nav">
+          <div style="font-size:48px;margin-bottom:16px">🧭</div>
+          <div style="font-family:var(--mono);font-size:13px;color:var(--muted);letter-spacing:0.5px;line-height:1.6;text-align:center">
+            Start navigation from<br><strong>Grid Nav</strong> to follow<br>bearing on compass
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /screen-wrap -->
+
+  <!-- BOTTOM NAV -->
+  <nav class="bottom-nav">
+    <button class="nav-btn active" id="nav-g2c" onclick="switchScreen('g2c')">
+      <span class="nav-icon">▤</span>
+      <span>Grid→Geo</span>
+    </button>
+    <button class="nav-btn" id="nav-c2g" onclick="switchScreen('c2g')">
+      <span class="nav-icon">◎</span>
+      <span>Geo→Grid</span>
+    </button>
+    <button class="nav-btn" id="nav-g2g" onclick="switchScreen('g2g')">
+      <span class="nav-icon">⬈</span>
+      <span>Grid Nav</span>
+    </button>
+    <button class="nav-btn" id="nav-map" onclick="switchScreen('map')">
+      <span class="nav-icon">🗺</span>
+      <span>Map</span>
+    </button>
+    <button class="nav-btn" id="nav-compass" onclick="switchScreen('compass')">
+      <span class="nav-icon">🧭</span>
+      <span>Compass</span>
+    </button>
+  </nav>
+</div>
+
+<div class="floating-nav-bar" id="floating-nav-bar">
+  <div class="floating-nav-head">
+    <div>
+      <div class="floating-nav-title">Live Navigation</div>
+      <div class="floating-nav-meta" id="floating-nav-meta">Idle</div>
+    </div>
+    <button class="floating-nav-toggle" id="floating-nav-toggle" onclick="toggleFloatingNavBar()">Minimize</button>
+  </div>
+  <div class="floating-nav-body">
+    <div class="floating-nav-grid">
+      <div class="floating-nav-item"><div class="floating-nav-label">Remaining</div><div class="floating-nav-value" id="floating-nav-distance">—</div></div>
+      <div class="floating-nav-item"><div class="floating-nav-label">ETA</div><div class="floating-nav-value" id="floating-nav-time">—</div></div>
+      <div class="floating-nav-item secondary"><div class="floating-nav-label">Bearing</div><div class="floating-nav-value" id="floating-nav-bearing">—</div></div>
+      <div class="floating-nav-item secondary"><div class="floating-nav-label">Elapsed</div><div class="floating-nav-value" id="floating-nav-elapsed">—</div></div>
+    </div>
+    <div class="floating-nav-actions">
+      <button class="show-map-btn visible inline-action" onclick="showGridNavigationOnMap()" style="display:inline-block">⊕ SHOW ON MAP</button>
+      <button class="convert-btn" onclick="endNavigation()">■ END NAVIGATION</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── AUTH ──
+const CORRECT_PASSWORD = "kwizera2026";
+const AUTH_STORAGE_KEY = "rwanda-grid-converter-auth";
+const overlay = document.getElementById('login-overlay');
+const passwordInput = document.getElementById('login-password');
+const loginMessage = document.getElementById('login-message');
+const loginBtn = document.getElementById('login-submit');
+const appRoot = document.getElementById('app');
+const authBanner = document.getElementById('auth-banner');
+const signoutBtn = document.getElementById('signout-btn');
+const connectionChip = document.getElementById('connection-chip');
+const connectionState = document.getElementById('connection-state');
+const splashScreen = document.getElementById('splash-screen');
+
+function hideSplashScreen() {
+  if (!splashScreen || splashScreen.dataset.hidden === 'true') return;
+  splashScreen.dataset.hidden = 'true';
+  splashScreen.classList.add('hidden');
+  setTimeout(() => { splashScreen.style.display = 'none'; }, 500);
+}
+
+function updateConnectionStatus() {
+  if (!connectionChip || !connectionState) return;
+  const online = navigator.onLine;
+  connectionChip.classList.toggle('offline', !online);
+  connectionState.textContent = online ? 'Online' : 'Offline';
+  connectionChip.title = online ? 'Connected to the network' : 'Working offline';
+}
+
+function persistAuthState(isSignedIn) {
+  try {
+    if (isSignedIn) localStorage.setItem(AUTH_STORAGE_KEY, 'signed-in');
+    else localStorage.removeItem(AUTH_STORAGE_KEY);
+  } catch (e) {
+    console.warn('Unable to persist auth state', e);
+  }
+}
+
+function isSignedIn() {
+  try {
+    return localStorage.getItem(AUTH_STORAGE_KEY) === 'signed-in';
+  } catch (e) {
+    console.warn('Unable to read auth state', e);
+    return false;
+  }
+}
+
+function unlockApplication() {
+  persistAuthState(true);
+  overlay.classList.add('hidden');
+  overlay.style.display = 'none';
+  appRoot.style.display = 'flex';
+  if (authBanner) authBanner.style.display = 'block';
+  loginMessage.textContent = '';
+  setTimeout(() => { const gi = document.getElementById('grid-input'); if(gi) gi.focus(); }, 300);
+}
+
+function signOutApplication() {
+  persistAuthState(false);
+  appRoot.style.display = 'none';
+  if (authBanner) authBanner.style.display = 'none';
+  overlay.classList.remove('hidden');
+  overlay.style.display = 'flex';
+  passwordInput.value = '';
+  loginMessage.textContent = '';
+  setTimeout(() => passwordInput.focus(), 150);
+}
+
+function attemptLogin() {
+  const entered = passwordInput.value.trim();
+  if (entered.toLowerCase() === CORRECT_PASSWORD.toLowerCase()) {
+    unlockApplication();
+  } else {
+    loginMessage.textContent = 'Invalid password';
+    passwordInput.value = '';
+    passwordInput.focus();
+  }
+}
+loginBtn.addEventListener('click', attemptLogin);
+passwordInput.addEventListener('keypress', e => { if (e.key === 'Enter') attemptLogin(); });
+signoutBtn?.addEventListener('click', signOutApplication);
+window.addEventListener('online', updateConnectionStatus);
+window.addEventListener('offline', updateConnectionStatus);
+updateConnectionStatus();
+
+// ── GEODETIC CONSTANTS ──
+const WGS84_A  = 6378137.0;
+const WGS84_E  = 0.0818191908426215;
+const WGS84_E2 = WGS84_E * WGS84_E;
+const TM_K0 = 0.9996;
+const TM_CM = 30.0;
+
+function tmBoundsToMapBounds(eMin,nMin,eMax,nMax){
+  const sw=tmStd_toGeo(eMin,nMin), ne=tmStd_toGeo(eMax,nMax);
+  return [[sw.latDeg,sw.lonDeg],[ne.latDeg,ne.lonDeg]];
+}
+
+// ── SHEETS ──
+const SHEETS = {
+  gako:{id:'gako',name:'GAKO',desc:'Rwanda TLM 50K · Kigali / Rwamagana · Ed.2',anchor:'Anchor: 201515 ↔ 02°14\'49.319"S / 30°10\'50.464"E · error < 0.03 m',anchorLat:-(2+14/60+49.319/3600),anchorLon:30+10/60+50.464/3600,anchorGrid:'201515',baseE:499990.3318,baseN:9700132.8125,tmE_min:null,tmE_max:null,tmN_min:null,tmN_max:null,gE_min:0,gE_max:330,gN_min:418,gN_max:790,mapBounds:[[-2.333,30.000],[-2.000,30.333]],latS_min:2.000,latS_max:2.333,lonMin:30.000,lonMax:30.333,center:[-2.167,30.167],zoom:11},
+  mihindi:{id:'mihindi',name:'MIHINDI',desc:'Rwanda TLM 50K · Mihindi Sheet',anchor:'Reference: Senene · supplied GR 288612',anchorLat:-(1+33/60+12.24/3600),anchorLon:30+32/60+59.62/3600,anchorGrid:'288612',baseE:500000,baseN:9800000,tmE_min:555000,tmE_max:582000,tmN_min:9803000,tmN_max:9832000,gE_min:550,gE_max:829,gN_min:30,gN_max:329,mapBounds:tmBoundsToMapBounds(555000,9803000,582000,9832000),center:[-1.63,30.54],zoom:11},
+  gabiro:{id:'gabiro',name:'GABIRO',desc:'Rwanda TLM 50K · Gabiro Sheet',anchor:'Reference: Nyarugumba Antena · GR 461317',anchorLat:-(1+31/60+23.32/3600),anchorLon:30+24/60+50.58/3600,anchorGrid:'461317',baseE:500000,baseN:9800000,tmE_min:528000,tmE_max:555000,tmN_min:9803000,tmN_max:9832000,gE_min:280,gE_max:559,gN_min:30,gN_max:329,mapBounds:tmBoundsToMapBounds(528000,9803000,555000,9832000),center:[-1.63,30.41],zoom:11},
+  nyagatare:{id:'nyagatare',name:'NYAGATARE',desc:'Rwanda TLM 50K · Nyagatare Sheet',anchor:'Reference: Pavilion · GR 458331',anchorLat:-(1+30/60+39.27/3600),anchorLon:30+24/60+43.10/3600,anchorGrid:'458331',baseE:500000,baseN:9800000,tmE_min:528000,tmE_max:555000,tmN_min:9832000,tmN_max:9861000,gE_min:280,gE_max:559,gN_min:320,gN_max:619,mapBounds:tmBoundsToMapBounds(528000,9832000,555000,9861000),center:[-1.37,30.41],zoom:11},
+};
+Object.values(SHEETS).forEach(sheet=>{const sw=sheet.mapBounds[0],ne=sheet.mapBounds[1];sheet.latS_min=Math.abs(ne[0]);sheet.latS_max=Math.abs(sw[0]);sheet.lonMin=sw[1];sheet.lonMax=ne[1];});
+let activeSheet=SHEETS.gako;
+
+// ── GEODETIC FUNCTIONS ──
+function geoToTM_std(latDeg,lonDeg){const e2=WGS84_E2,e4=e2*e2,e6=e4*e2,ep2=e2/(1-e2),lat=latDeg*Math.PI/180,lon=lonDeg*Math.PI/180,cm=TM_CM*Math.PI/180,sinL=Math.sin(lat),cosL=Math.cos(lat),tanL=Math.tan(lat),N=WGS84_A/Math.sqrt(1-e2*sinL*sinL),T=tanL*tanL,C=ep2*cosL*cosL,A=cosL*(lon-cm),M=WGS84_A*((1-e2/4-3*e4/64-5*e6/256)*lat-(3*e2/8+3*e4/32+45*e6/1024)*Math.sin(2*lat)+(15*e4/256+45*e6/1024)*Math.sin(4*lat)-(35*e6/3072)*Math.sin(6*lat)),x=TM_K0*N*(A+(1-T+C)*A*A*A/6+(5-18*T+T*T+72*C-58*ep2)*A*A*A*A*A/120)+500000,y=TM_K0*(M+N*tanL*(A*A/2+(5-T+9*C+4*C*C)*A*A*A*A/24+(61-58*T+T*T+600*C-330*ep2)*A*A*A*A*A*A/720));return{stdE:x,stdN:latDeg<0?y+10000000:y};}
+function tmStd_toGeo(stdE,stdN){const e2=WGS84_E2,e4=e2*e2,e6=e4*e2,ep2=e2/(1-e2),e1=(1-Math.sqrt(1-e2))/(1+Math.sqrt(1-e2)),x=stdE-500000,y=stdN-10000000,M=y/TM_K0,mu=M/(WGS84_A*(1-e2/4-3*e4/64-5*e6/256)),phi1=mu+(3*e1/2-27*e1*e1*e1/32)*Math.sin(2*mu)+(21*e1*e1/16-55*e1*e1*e1*e1/32)*Math.sin(4*mu)+(151*e1*e1*e1/96)*Math.sin(6*mu)+(1097*e1*e1*e1*e1/512)*Math.sin(8*mu),sinP=Math.sin(phi1),cosP=Math.cos(phi1),tanP=Math.tan(phi1),N1=WGS84_A/Math.sqrt(1-e2*sinP*sinP),T1=tanP*tanP,C1=ep2*cosP*cosP,R1=WGS84_A*(1-e2)/Math.pow(1-e2*sinP*sinP,1.5),D=x/(N1*TM_K0),lat=phi1-(N1*tanP/R1)*(D*D/2-(5+3*T1+10*C1-4*C1*C1-9*ep2)*D*D*D*D/24+(61+90*T1+298*C1+45*T1*T1-252*ep2-3*C1*C1)*D*D*D*D*D*D/720),lon=TM_CM+(180/Math.PI)*((D-(1+2*T1+C1)*D*D*D/6+(5-2*C1+28*T1-3*C1*C1+8*ep2+24*T1*T1)*D*D*D*D*D/120)/cosP);return{latDeg:lat*180/Math.PI,lonDeg:lon};}
+function gridToStdTM(gE,gN,sheet=activeSheet){return{stdE:sheet.baseE+gE*100,stdN:sheet.baseN+gN*100};}
+function stdTMtoGrid(stdE,stdN,sheet=activeSheet){return{gE:(stdE-sheet.baseE)/100,gN:(stdN-sheet.baseN)/100};}
+function sheetContainsGrid(sheet,gE,gN){return gE>=sheet.gE_min&&gE<=sheet.gE_max&&gN>=sheet.gN_min&&gN<=sheet.gN_max;}
+function sheetContainsGeo(sheet,latS,lonE){return latS>=sheet.latS_min&&latS<=sheet.latS_max&&lonE>=sheet.lonMin&&lonE<=sheet.lonMax;}
+function findSheetForGrid(gE,gN){if(sheetContainsGrid(activeSheet,gE,gN))return activeSheet;return Object.values(SHEETS).find(s=>s.id!==activeSheet.id&&sheetContainsGrid(s,gE,gN))||null;}
+function findSheetForGeo(latS,lonE){if(sheetContainsGeo(activeSheet,latS,lonE))return activeSheet;return Object.values(SHEETS).find(s=>s.id!==activeSheet.id&&sheetContainsGeo(s,latS,lonE))||null;}
+function validateGrid(gE,gN){if(gE<activeSheet.gE_min||gE>activeSheet.gE_max)throw new Error(`Easting ${gE} outside ${activeSheet.name} (${activeSheet.gE_min}–${activeSheet.gE_max})`);if(gN<activeSheet.gN_min||gN>activeSheet.gN_max)throw new Error(`Northing ${gN} outside ${activeSheet.name} (${activeSheet.gN_min}–${activeSheet.gN_max})`);}
+function validateGeo(latS,lonE){if(latS<activeSheet.latS_min||latS>activeSheet.latS_max)throw new Error(`Latitude ${latS.toFixed(5)}°S outside ${activeSheet.name}`);if(lonE<activeSheet.lonMin||lonE>activeSheet.lonMax)throw new Error(`Longitude ${lonE.toFixed(5)}°E outside ${activeSheet.name}`);}
+function dms2dec(d,m,s){return d+m/60+s/3600;}
+function dec2dms(dec){dec=Math.abs(dec);const d=Math.floor(dec),mFull=(dec-d)*60,m=Math.floor(mFull),s=(mFull-m)*60;return{d,m,s};}
+function fmtDMS(d,m,s,hemi,decimals=3){const ss=s.toFixed(decimals);return`${String(d).padStart(2,'0')}°${String(m).padStart(2,'0')}'${ss.padStart(decimals+3,'0')}"${hemi}`;}
+function renderDmsOutput(d,m,s,hemi,decimals=3){const deg=String(d).padStart(2,'0');const min=String(m).padStart(2,'0');const sec=s.toFixed(decimals);return`<div class="dms-output-group"><div class="dms-output-box">${deg}<span class="dms-output-unit">°</span></div><div class="dms-output-box">${min}<span class="dms-output-unit">'</span></div><div class="dms-output-box">${sec}<span class="dms-output-unit">"</span></div><div class="dms-output-hemisphere">${hemi}</div></div>`;}
+function doGridToGeo(gridStr){if(!/^\d{6}$/.test(gridStr))throw new Error('Must be exactly 6 digits');const gE=parseInt(gridStr.slice(0,3),10),gN=parseInt(gridStr.slice(3,6),10);validateGrid(gE,gN);const{stdE,stdN}=gridToStdTM(gE,gN),{latDeg,lonDeg}=tmStd_toGeo(stdE,stdN),latS=-latDeg,latDMS=dec2dms(latS),lonDMS=dec2dms(lonDeg);return{latS,lonDeg,latDMS,lonDMS,gE,gN,stdE,stdN,gridRef:gridStr};}
+function doGeoToGrid(latS,lonE){validateGeo(latS,lonE);const{stdE,stdN}=geoToTM_std(-latS,lonE),{gE:gE_raw,gN:gN_raw}=stdTMtoGrid(stdE,stdN),gE=Math.round(gE_raw),gN=Math.round(gN_raw);validateGrid(gE,gN);const gridRef=String(gE).padStart(3,'0')+String(gN).padStart(3,'0'),latDMS=dec2dms(latS),lonDMS=dec2dms(lonE);return{gridRef,gE,gN,gE_raw,gN_raw,stdE,stdN,latS,lonE,latDMS,lonDMS};}
+function doGridToGeoOnSheet(gridStr,sheet){
+  if(!/^\d{6}$/.test(gridStr))throw new Error('Must be exactly 6 digits');
+  const gE=parseInt(gridStr.slice(0,3),10),gN=parseInt(gridStr.slice(3,6),10);
+  if(!sheetContainsGrid(sheet,gE,gN))throw new Error(`Grid ${gridStr} outside ${sheet.name}`);
+  const{stdE,stdN}=gridToStdTM(gE,gN,sheet),{latDeg,lonDeg}=tmStd_toGeo(stdE,stdN),latS=-latDeg,latDMS=dec2dms(latS),lonDMS=dec2dms(lonDeg);
+  return{latS,lonDeg,lat:-latS,lon:lonDeg,latDMS,lonDMS,gE,gN,stdE,stdN,gridRef:gridStr,sheet};
+}
+function doGeoToGridOnSheet(latS,lonE,sheet){
+  if(!sheetContainsGeo(sheet,latS,lonE))throw new Error(`Coordinates outside ${sheet.name}`);
+  const{stdE,stdN}=geoToTM_std(-latS,lonE),{gE:gE_raw,gN:gN_raw}=stdTMtoGrid(stdE,stdN,sheet),gE=Math.round(gE_raw),gN=Math.round(gN_raw);
+  if(!sheetContainsGrid(sheet,gE,gN))throw new Error(`Resolved grid outside ${sheet.name}`);
+  const gridRef=String(gE).padStart(3,'0')+String(gN).padStart(3,'0'),latDMS=dec2dms(latS),lonDMS=dec2dms(lonE);
+  return{gridRef,gE,gN,gE_raw,gN_raw,stdE,stdN,latS,lonE,lat:-latS,lon:lonE,latDMS,lonDMS,sheet};
+}
+function resolveGridReference(gridStr){
+  if(!/^\d{6}$/.test(gridStr))throw new Error('Grid references must be exactly 6 digits');
+  const gE=parseInt(gridStr.slice(0,3),10),gN=parseInt(gridStr.slice(3,6),10);
+  const sheet=findSheetForGrid(gE,gN);
+  if(!sheet)throw new Error(`Grid ${gridStr} is outside all loaded sheets`);
+  return doGridToGeoOnSheet(gridStr,sheet);
+}
+function parseDmsComponent(part,type){
+  const cleaned=String(part||'').trim().toUpperCase().replace(/[′’]/g,"'").replace(/[″”]/g,'"');
+  const hemiMatch=cleaned.match(/[NSEW]/);
+  if(!hemiMatch)throw new Error(`Missing ${type==='lat'?'N/S':'E/W'} hemisphere in DMS search`);
+  const hemi=hemiMatch[0];
+  const nums=cleaned.match(/\d+(?:\.\d+)?/g);
+  if(!nums||nums.length===0)throw new Error(`Invalid ${type==='lat'?'latitude':'longitude'} DMS search`);
+  const deg=Number(nums[0]),min=Number(nums[1]||0),sec=Number(nums[2]||0);
+  if(min>=60||sec>=60)throw new Error('Minutes and seconds must be below 60');
+  const dec=deg+min/60+sec/3600;
+  if(type==='lat'){
+    if(!/[NS]/.test(hemi))throw new Error('Latitude must end with N or S');
+    return hemi==='S'?-dec:dec;
+  }
+  if(!/[EW]/.test(hemi))throw new Error('Longitude must end with E or W');
+  return hemi==='W'?-dec:dec;
+}
+function resolveGeoDmsSearch(query){
+  const parts=String(query||'').trim().split(/\s*[,;]\s*/).filter(Boolean);
+  if(parts.length!==2)throw new Error('Use DMS like 02 14 49.319 S, 30 10 50.464 E');
+  const lat=parseDmsComponent(parts[0],'lat');
+  const lon=parseDmsComponent(parts[1],'lon');
+  const latS=Math.abs(lat),lonE=lon;
+  const sheet=findSheetForGeo(latS,lonE);
+  if(!sheet)throw new Error('Coordinates are outside all loaded sheets');
+  return doGeoToGridOnSheet(latS,lonE,sheet);
+}
+function resolveMapSearch(query){
+  const trimmed=String(query||'').trim();
+  if(!trimmed)throw new Error('Enter a grid reference or DMS coordinates');
+  return /^\d{6}$/.test(trimmed)?resolveGridReference(trimmed):resolveGeoDmsSearch(trimmed);
+}
+function resolveLiveStart(){
+  if(!userLatLng)throw new Error('Current location not available yet. Tap allow location, then build navigation again.');
+  const lat=userLatLng.lat,lon=userLatLng.lng,latS=Math.abs(lat);
+  const sheet=findSheetForGeo(latS,lon);
+  if(sheet){
+    const r=doGeoToGridOnSheet(latS,lon,sheet);
+    return{...r,isLive:true,label:`LIVE · ${sheet.name} · GR ${r.gridRef}`};
+  }
+  const latDMS=dec2dms(latS),lonDMS=dec2dms(lon);
+  return{
+    latS,lonE:lon,lat,lon,latDMS,lonDMS,stdE:NaN,stdN:NaN,gridRef:'Outside loaded sheets',
+    sheet:{id:'external',name:'EXTERNAL'},isLive:true,label:'LIVE · Outside loaded sheets'
+  };
+}
+
+function showMapOfflineNotice(){
+  // Intentionally left blank. Previously this created a persistent "offline" banner
+  // that could appear erroneously when the map library wasn't yet available.
+  // Keep this function as a no-op so the app behaves like the original online-only
+  // map: map features load when `leaflet.js` is present and the network is available.
+}
+
+function ensureLeaflet(){
+  // Return whether the Leaflet library has been loaded. Do not create UI banners
+  // from this check — map initialization will handle offline/network messaging.
+  return (typeof window.L !== 'undefined');
+}
+
+// ── SHEET MANAGEMENT ──
+function selectSheet(id){
+  if(!SHEETS[id])return;
+  activeSheet=SHEETS[id];
+  document.querySelectorAll('.sheet-btn').forEach(b=>b.classList.remove('active-sheet'));
+  document.getElementById(`sbtn-${id}`)?.classList.add('active-sheet');
+  document.getElementById('hdr-sheet-name').textContent=activeSheet.name;
+  document.getElementById('hdr-anchor-note').textContent=activeSheet.anchor;
+  document.getElementById('sheet-info-name').textContent=activeSheet.name;
+  const n2=document.getElementById('sheet-info-name2');if(n2)n2.textContent=activeSheet.name;
+  document.getElementById('sheet-info-baseE').textContent=`${activeSheet.baseE} m`;
+  document.getElementById('sheet-info-baseN').textContent=`${activeSheet.baseN} m`;
+  document.getElementById('sheet-info-gEmin').textContent=activeSheet.gE_min;
+  document.getElementById('sheet-info-gEmax').textContent=activeSheet.gE_max;
+  document.getElementById('sheet-info-gNmin').textContent=activeSheet.gN_min;
+  document.getElementById('sheet-info-gNmax').textContent=activeSheet.gN_max;
+  document.getElementById('sheet-info-anchor').textContent=activeSheet.anchor;
+  ['g2c-result','g2c-steps'].forEach(i=>document.getElementById(i)?.classList.remove('show'));
+  ['c2g-result','c2g-steps'].forEach(i=>document.getElementById(i)?.classList.remove('show'));
+  document.getElementById('g2c-steps-btn').style.display='none';
+  document.getElementById('c2g-steps-btn').style.display='none';
+  document.getElementById('g2c-err').classList.remove('show');
+  document.getElementById('c2g-err').classList.remove('show');
+  if(mapReady && ensureLeaflet()){
+    if(sheetRect)map.removeLayer(sheetRect);
+    if(gridLayer)map.removeLayer(gridLayer);
+    sheetRect=L.rectangle(activeSheet.mapBounds,{color:'#39ff6a',weight:1.5,opacity:.7,fillColor:'#39ff6a',fillOpacity:.03,dashArray:'6 4'}).addTo(map);
+    gridLayer=buildSheetGridLayer(activeSheet);
+    syncGridVisibility();
+    map.fitBounds(activeSheet.mapBounds,{padding:[20,20]});
+  }
+}
+
+// ── SCREEN NAVIGATION ──
+let currentScreen='g2c';
+function switchScreen(name){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById(`screen-${name}`).classList.add('active');
+  document.getElementById(`nav-${name}`).classList.add('active');
+  const app=document.getElementById('app');
+  app?.classList.toggle('map-focus',name==='map');
+  app?.classList.toggle('compass-focus',name==='compass');
+  currentScreen=name;
+  if(name==='map'){
+    initMap();
+    setTimeout(()=>{if(map)map.invalidateSize();},180);
+    setTimeout(()=>{if(map)map.invalidateSize();},450);
+    // Check geolocation permission and prompt if appropriate (GitHub Pages needs HTTPS)
+    try{checkGeolocationPermissionAndRequest();}catch(e){}
+  }
+  if(name==='compass'){
+    startUserLocationWatch({quiet:true});
+    startCompassSensor();
+    updateCompassUI();
+  }
+}
+
+// ── MAP ──
+let map,mapReady=false,layers={},pins=[],activePin=-1,lastResult=null,userLatLng=null,userMarker=null,geoWatchId=null,rulerMode=false,rulerLine=null,rulerTooltip=null,pointerCircle=null,routes=[],measureFromPin=false,originPin=null,measureLine=null,measureTooltip=null,pinCounter=0,routesVisible=true;
+let sheetRect=null,gridLayer=null,gridVisible=true;
+let navLegLayer=null,navLegMarkers=[];
+const MINUTES_PER_KM_DAY=20,MINUTES_PER_KM_NIGHT=6.6666667;
+const NAV_SPEEDS={foot:5,vehicle:40};
+let navStartMode='live',navTravelMode='foot',activeNavigation=null,navTicker=null,compassArrivalNotified=false;
+let floatingNavMinimized=false,mapNavMinimized=true,lastNavPosition=null;
+let mapInfoVisible=false;
+let compassHeading=null,compassSensorActive=false,compassPermissionState='unknown';
+
+function setMapButtonLabel(id,label){
+  const btn=document.getElementById(id);
+  const text=btn?.querySelector('.map-btn-text');
+  if(text)text.textContent=label;
+  else if(btn)btn.textContent=label;
+}
+
+function initMap(){
+  if(mapReady)return;
+  const mapContainer=document.getElementById('tactical-map');
+  if(!mapContainer)return;
+  if(!ensureLeaflet()){
+    mapContainer.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#ffb830;font-family:var(--mono);font-size:11px;letter-spacing:1px;padding:16px;text-align:center">Map library could not be loaded. Please refresh the page.</div>';
+    return;
+  }
+  requestAnimationFrame(()=>{
+    if(mapReady)return;
+    if(!navigator.onLine){
+      mapContainer.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#ffb830;font-family:var(--mono);font-size:11px;letter-spacing:1px;padding:16px;text-align:center">Live map tiles need an internet connection. Please reconnect and try again.</div>';
+      return;
+    }
+    const osm=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,subdomains:['a','b','c'],crossOrigin:true});
+    const sat=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,crossOrigin:true});
+    const topo=L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',{maxZoom:17,subdomains:['a','b','c'],crossOrigin:true});
+    layers={osm,sat,topo};
+    map=L.map('tactical-map',{center:activeSheet.center,zoom:activeSheet.zoom,layers:[osm],zoomControl:false,attributionControl:false,tapTolerance:15});
+    mapReady=true;
+    sheetRect=L.rectangle(activeSheet.mapBounds,{color:'#39ff6a',weight:1.5,opacity:.7,fillColor:'#39ff6a',fillOpacity:.03,dashArray:'6 4'}).addTo(map);
+    gridLayer=buildSheetGridLayer(activeSheet);
+    syncGridVisibility();
+    map.on('click',e=>{
+      if(rulerMode)return;
+      const latlng=e.latlng;
+      try{
+        const matchedSheet=findSheetForGeo(Math.abs(latlng.lat),latlng.lng);
+        if(!matchedSheet){alert('Outside loaded sheet bounds');return;}
+        if(matchedSheet.id!==activeSheet.id)selectSheet(matchedSheet.id);
+        const r=doGeoToGrid(Math.abs(latlng.lat),latlng.lng);
+        const name=prompt('Pin name (optional)','');
+        addPin({gridRef:r.gridRef,latS:Math.abs(latlng.lat),lonE:latlng.lng,lat:latlng.lat,lon:latlng.lng,latDMSstr:fmtDMS(r.latDMS.d,r.latDMS.m,r.latDMS.s,'S'),lonDMSstr:fmtDMS(r.lonDMS.d,r.lonDMS.m,r.lonDMS.s,'E'),stdE:r.stdE,stdN:r.stdN,src:'map',name:name||`Pin ${pinCounter+1}`,sheet:activeSheet.name});
+      }catch(e){console.warn('Map click outside grid',e);}
+    });
+    map.on('mousemove',e=>{
+      const latlng=e.latlng;
+      try{
+        const r=doGeoToGrid(Math.abs(latlng.lat),latlng.lng);
+      }catch{
+      }
+    });
+    ['fullscreenchange','webkitfullscreenchange','msfullscreenchange'].forEach(evt=>document.addEventListener(evt,handleMapFullscreenChange));
+    startUserLocationWatch({quiet:true});
+    setTimeout(()=>{if(map)map.invalidateSize();},150);
+  });
+}
+
+function buildSheetGridLayer(sheet=activeSheet){
+  if(!ensureLeaflet())return null;
+  const group=L.layerGroup();
+  const majorEvery=10,minorEvery=5;
+  const verticalSamples=gE=>{const start=gridToStdTM(gE,sheet.gN_min,sheet),end=gridToStdTM(gE,sheet.gN_max,sheet);return[tmStd_toGeo(start.stdE,start.stdN),tmStd_toGeo(end.stdE,end.stdN)].map(p=>[p.latDeg,p.lonDeg]);};
+  const horizontalSamples=gN=>{const start=gridToStdTM(sheet.gE_min,gN,sheet),end=gridToStdTM(sheet.gE_max,gN,sheet);return[tmStd_toGeo(start.stdE,start.stdN),tmStd_toGeo(end.stdE,end.stdN)].map(p=>[p.latDeg,p.lonDeg]);};
+  for(let gE=sheet.gE_min;gE<=sheet.gE_max;gE++){const isMajor=gE%majorEvery===0,isMinor=!isMajor&&gE%minorEvery===0;if(!isMajor&&!isMinor)continue;L.polyline(verticalSamples(gE),{color:'#000',weight:isMajor?1.2:0.8,opacity:isMajor?0.26:0.14,dashArray:isMajor?'':'4 6',interactive:false}).addTo(group);if(isMajor){const s=gridToStdTM(gE,sheet.gN_min,sheet),sp=tmStd_toGeo(s.stdE,s.stdN);L.marker([sp.latDeg,sp.lonDeg],{icon:L.divIcon({className:'grid-label',html:`E${String(gE).padStart(3,'0')}`,iconSize:[40,12],iconAnchor:[20,-2]}),interactive:false}).addTo(group);}}
+  for(let gN=sheet.gN_min;gN<=sheet.gN_max;gN++){const isMajor=gN%majorEvery===0,isMinor=!isMajor&&gN%minorEvery===0;if(!isMajor&&!isMinor)continue;L.polyline(horizontalSamples(gN),{color:'#000',weight:isMajor?1.2:0.8,opacity:isMajor?0.26:0.12,dashArray:isMajor?'':'4 6',interactive:false}).addTo(group);if(isMajor){const w=gridToStdTM(sheet.gE_min,gN,sheet),wp=tmStd_toGeo(w.stdE,w.stdN);L.marker([wp.latDeg,wp.lonDeg],{icon:L.divIcon({className:'grid-label',html:`N${String(gN).padStart(3,'0')}`,iconSize:[40,12],iconAnchor:[-2,6]}),interactive:false}).addTo(group);}}
+  return group;
+}
+function syncGridVisibility(){if(!mapReady||!gridLayer)return;if(gridVisible){if(!map.hasLayer(gridLayer))gridLayer.addTo(map);}else if(map.hasLayer(gridLayer))map.removeLayer(gridLayer);updateGridToggleButton();}
+function toggleGridLines(){gridVisible=!gridVisible;syncGridVisibility();}
+function updateGridToggleButton(){
+  const btn=document.getElementById('btn-grid-toggle');
+  btn?.classList.toggle('active-layer',gridVisible);
+  setMapButtonLabel('btn-grid-toggle',gridVisible?'Grid On':'Grid Off');
+}
+function googleMapsUrl(lat,lon,label=''){return`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${lat},${lon}`)}`;}
+function googleMapsDirectionsUrl(originLat,originLon,destinationLat,destinationLon,mode='driving'){return`https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(`${originLat},${originLon}`)}&destination=${encodeURIComponent(`${destinationLat},${destinationLon}`)}&travelmode=${encodeURIComponent(mode)}`;}
+function updateGoogleLinks(obj){if(!obj)return;const url=googleMapsUrl(obj.lat||(-obj.latS),obj.lon||obj.lonE,obj.name);const g2c=document.getElementById('g2c-google-link');const c2g=document.getElementById('c2g-google-link');if(g2c)g2c.href=url;if(c2g)c2g.href=url;}
+function navigationResultFromPoints(start,end,startLabel){
+  const startDms=`${fmtDMS(start.latDMS.d,start.latDMS.m,start.latDMS.s,'S')} · ${fmtDMS(start.lonDMS.d,start.lonDMS.m,start.lonDMS.s,'E')}`;
+  const endDms=`${fmtDMS(end.latDMS.d,end.latDMS.m,end.latDMS.s,'S')} · ${fmtDMS(end.lonDMS.d,end.lonDMS.m,end.lonDMS.s,'E')}`;
+  const distanceKm=distanceBetween(start.lat,start.lon,end.lat,end.lon);
+  const bearing=bearingBetween(start.lat,start.lon,end.lat,end.lon);
+  const backBearing=(bearing+180)%360;
+  const etaMinutes=(distanceKm/NAV_SPEEDS[navTravelMode])*60;
+  const objectiveName=end.name||'Objective';
+  return{start,end,distanceKm,bearing,backBearing,startDms,endDms,etaMinutes,startLabel,objectiveName};
+}
+function clearNavLeg(){
+  if(mapReady&&navLegLayer&&map.hasLayer(navLegLayer))map.removeLayer(navLegLayer);
+  navLegMarkers.forEach(marker=>{if(mapReady&&marker&&map.hasLayer(marker))map.removeLayer(marker);});
+  navLegLayer=null;
+  navLegMarkers=[];
+}
+function bearingBetween(lat1,lon1,lat2,lon2){
+  const phi1=toRad(lat1),phi2=toRad(lat2),deltaLon=toRad(lon2-lon1);
+  const y=Math.sin(deltaLon)*Math.cos(phi2);
+  const x=Math.cos(phi1)*Math.sin(phi2)-Math.sin(phi1)*Math.cos(phi2)*Math.cos(deltaLon);
+  return (Math.atan2(y,x)*180/Math.PI+360)%360;
+}
+function bearingLabel(deg){
+  const dirs=['N','NE','E','SE','S','SW','W','NW'];
+  return dirs[Math.round(deg/45)%8];
+}
+function formatBearing(deg){return`${deg.toFixed(1)}° (${bearingLabel(deg)})`;}
+function buildNavVector(start,end){
+  const eastMeters=(end.stdE-start.stdE);
+  const northMeters=(end.stdN-start.stdN);
+  const eastLabel=`${eastMeters>=0?'+':''}${eastMeters.toFixed(0)} m E`;
+  const northLabel=`${northMeters>=0?'+':''}${northMeters.toFixed(0)} m N`;
+  return`${eastLabel} · ${northLabel}`;
+}
+function drawNavigationLeg(start,end,opts={}){
+  if(!ensureLeaflet())return;
+  if(!mapReady)initMap();
+  const shouldFit=opts.fit!==false;
+  clearNavLeg();
+  navLegLayer=L.polyline([[start.lat,start.lon],[end.lat,end.lon]],{color:'#ffb830',weight:4,opacity:.95,dashArray:'10 6'}).addTo(map);
+  const startMarker=L.marker([start.lat,start.lon],{icon:L.divIcon({className:'',html:'<div class="tac-marker tac-cal"><div class="tac-ring"></div><div class="tac-dot"></div></div>',iconSize:[28,28],iconAnchor:[14,14]})}).addTo(map);
+  const endMarker=L.marker([end.lat,end.lon],{icon:L.divIcon({className:'',html:'<div class="tac-marker"><div class="tac-ring"></div><div class="tac-dot"></div></div>',iconSize:[28,28],iconAnchor:[14,14]})}).addTo(map);
+  startMarker.bindPopup(`<b style="font-size:13px;color:#ffb830">Start</b><br>GR ${start.gridRef}<br>${start.sheet.name}<br>${start.lat.toFixed(6)}, ${start.lon.toFixed(6)}`);
+  endMarker.bindPopup(`<b style="font-size:13px;color:#39ff6a">Destination</b><br>GR ${end.gridRef}<br>${end.sheet.name}<br>${end.lat.toFixed(6)}, ${end.lon.toFixed(6)}`);
+  navLegMarkers=[startMarker,endMarker];
+  if(shouldFit)map.fitBounds(L.latLngBounds([[start.lat,start.lon],[end.lat,end.lon]]),{padding:[30,30]});
+}
+function addPin(obj){
+  if(!ensureLeaflet())return;
+  pinCounter++;
+  const id=`pin-${pinCounter}`;
+  let lat=obj.lat||(-obj.latS),lon=obj.lon||obj.lonE;
+
+  // Topo pins must appear "above" the reference GR 184589 (-2.18043, 30.16537).
+  // Implemented as a popup offset (not moving the actual coordinate).
+  const topoRef={lat:-2.18043,lon:30.16537};
+  const isTopoRef=(activeLayer==='topo' && Math.abs(lat-topoRef.lat)<0.00002 && Math.abs(lon-topoRef.lon)<0.00002);
+  const isBottomPopupGrid=String(obj.gridRef||'')==='207557';
+
+  const pin={...obj,id,lat,lon,forRoute:false,_m:null,_topoRef:isTopoRef,_bottomPopup:isBottomPopupGrid};
+  if(pins.length>0){const prev=pins[pins.length-1];const km=distanceBetween(prev.lat,prev.lon,lat,lon);pin.prevDistance=formatDistance(km);}
+  if(userLatLng){const km=distanceBetween(userLatLng.lat,userLatLng.lng,lat,lon);pin.distanceToUser=formatDistance(km);}
+  const marker=L.marker([lat,lon],{icon:L.divIcon({className:'',html:'<div class="tac-marker"><div class="tac-ring"></div><div class="tac-dot"></div></div>',iconSize:[28,28],iconAnchor:[14,14]})}).addTo(map);
+  const popupContent=`<b style="font-size:13px;color:#39ff6a">${escapeHtml(pin.name)}</b><br>GR ${pin.gridRef}`+
+    `<br>${pin.latDMSstr}`+
+    `<br>${pin.lonDMSstr}`+
+    `<div class="popup-actions"><button onclick="jumpToPin(${pins.length})">Focus</button><button onclick="navigateToPin(${pins.length})">Nav</button><button onclick="window.open('${googleMapsUrl(lat,lon)}','_blank','noopener')">Maps</button><button class="delete" onclick="removePin(${pins.length})">Remove</button></div>`;
+
+  const popupOptions=pin._topoRef?{offset:[0,-30]}:(pin._bottomPopup?{offset:[0,30]}:{});
+  marker.bindPopup(popupContent,popupOptions);
+  pin._m=marker;
+  pins.push(pin);
+  activePin=pins.length-1;
+  updateInfoBar(pin);
+  renderHistory();
+  map.setView([lat,lon],Math.max(map.getZoom(),13));
+}
+function updateInfoBar(o){
+  mapInfoVisible=false;
+  document.getElementById('map-info-bar').classList.remove('show');
+  document.getElementById('btn-map-info')?.classList.remove('active-layer');
+  document.getElementById('mib-grid').textContent=o.gridRef;
+  document.getElementById('mib-lat').textContent=o.latDMSstr;
+  document.getElementById('mib-lon').textContent=o.lonDMSstr;
+  document.getElementById('mib-tme').textContent=`${Math.round(o.stdE)} m`;
+  document.getElementById('mib-tmn').textContent=`${Math.round(o.stdN)} m`;
+  if(userLatLng){const km=distanceBetween(userLatLng.lat,userLatLng.lng,o.lat,o.lon);o.distanceToUser=formatDistance(km);document.getElementById('mib-distance').textContent=o.distanceToUser;}else{document.getElementById('mib-distance').textContent='—';}
+  updateGoogleLinks(o);
+}
+function setMapInfoVisible(show){
+  const bar=document.getElementById('map-info-bar');
+  const btn=document.getElementById('btn-map-info');
+  if(!bar||!btn)return;
+  mapInfoVisible=show;
+  bar.classList.toggle('show',show);
+  btn.classList.toggle('active-layer',show);
+}
+function toggleMapInfoBar(){
+  const hasData=document.getElementById('mib-grid')?.textContent;
+  if(!hasData||hasData==='—')return;
+  setMapInfoVisible(!mapInfoVisible);
+}
+function renderHistory(){
+  const list=document.getElementById('history-list');
+  const count=document.getElementById('pin-count');
+  if(count)count.textContent=`(${pins.length})`;
+  if(!pins.length){list.innerHTML='<div class="no-pins">No pins yet · tap the map to add pins.</div>';return;}
+  list.innerHTML=pins.map((p,i)=>`
+    <div class="history-item${i===activePin?' active-pin':''}" onclick="jumpToPin(${i})">
+      <div class="hi-top">
+        <span class="hi-num">${i+1}</span>
+        <span class="hi-grid">${p.gridRef}</span>
+        <span class="hi-src">${p.sheet||activeSheet.name}</span>
+        <button class="hi-del" onclick="event.stopPropagation();removePin(${i})">×</button>
+      </div>
+      <div class="hi-name">${escapeHtml(p.name)}</div>
+      <div class="hi-dms">${p.latDMSstr} · ${p.lonDMSstr}</div>
+      <button class="copy-btn" style="margin-top:6px" onclick="event.stopPropagation();navigateToPin(${i})">NAVIGATE</button>
+      ${p.prevDistance?`<span class="hi-distance delta">Δ ${p.prevDistance}</span>`:''}
+      ${p.distanceToUser?`<span class="hi-distance" style="margin-left:4px;color:var(--muted)">You: ${p.distanceToUser}</span>`:''}
+      <label class="hi-route-check" onclick="event.stopPropagation()"><input type="checkbox" ${p.forRoute?'checked':''} onchange="togglePinForRoute('${p.id}',this.checked)"> Include in Route</label>
+    </div>`).join('');
+}
+function jumpToPin(i){
+  if(!ensureLeaflet())return;
+  activePin=i;const o=pins[i];pins.forEach((p,j)=>{if(p._m)p._m.setIcon(L.divIcon({className:'',html:'<div class="tac-marker tac-old"><div class="tac-ring"></div><div class="tac-dot"></div></div>',iconSize:[28,28],iconAnchor:[14,14]}));});if(o._m){o._m.setIcon(L.divIcon({className:'',html:'<div class="tac-marker"><div class="tac-ring"></div><div class="tac-dot"></div></div>',iconSize:[28,28],iconAnchor:[14,14]}));o._m.openPopup();map.setView([o.lat,o.lon],Math.max(map.getZoom(),13));}updateInfoBar(o);renderHistory();}
+function navigateToPin(i){
+  if(!ensureLeaflet())return;
+  const p=pins[i];
+  if(!p)return;
+  try{
+    const start=buildStartPointForNavigation();
+    const startLabel=navStartMode==='live'?(start.label||'LIVE START'):`${start.sheet.name} · GR ${start.gridRef}`;
+    const end={
+      gridRef:p.gridRef,
+      lat:p.lat,lon:p.lon,latS:Math.abs(p.lat),lonE:p.lon,stdE:p.stdE,stdN:p.stdN,
+      latDMS:dec2dms(Math.abs(p.lat)),lonDMS:dec2dms(p.lon),sheet:{name:p.sheet||activeSheet.name,id:(p.sheet||activeSheet.name).toLowerCase()},name:p.name||`${p.sheet||activeSheet.name} · GR ${p.gridRef}`
+    };
+    lastNavigationResult=navigationResultFromPoints(start,end,startLabel);
+    document.getElementById('g2g-start').textContent=startLabel;
+    document.getElementById('g2g-end').textContent=`${end.sheet.name} · GR ${end.gridRef}`;
+    document.getElementById('g2g-start-coords').innerHTML=`${lastNavigationResult.startDms}<br>${start.lat.toFixed(6)}, ${start.lon.toFixed(6)}`;
+    document.getElementById('g2g-end-coords').innerHTML=`${lastNavigationResult.endDms}<br>${end.lat.toFixed(6)}, ${end.lon.toFixed(6)}`;
+    document.getElementById('g2g-distance').textContent=formatDistance(lastNavigationResult.distanceKm);
+    document.getElementById('g2g-eta').textContent=formatMinutes(lastNavigationResult.etaMinutes);
+    document.getElementById('g2g-bearing').textContent=formatBearing(lastNavigationResult.bearing);
+    document.getElementById('g2g-back-bearing').textContent=formatBearing(lastNavigationResult.backBearing);
+    document.getElementById('g2g-vector').textContent=isFinite(start.stdE)&&isFinite(end.stdE)?buildNavVector(start,end):'Unavailable outside loaded sheets';
+    document.getElementById('g2g-prec').textContent=`Start TM ${isFinite(start.stdE)?start.stdE.toFixed(2):'—'} / ${isFinite(start.stdN)?start.stdN.toFixed(2):'—'} · Destination TM ${isFinite(end.stdE)?end.stdE.toFixed(2):'—'} / ${isFinite(end.stdN)?end.stdN.toFixed(2):'—'}`;
+    document.getElementById('g2g-google-link').href=googleMapsDirectionsUrl(start.lat,start.lon,end.lat,end.lon);
+    document.getElementById('g2g-result').classList.add('show');
+    document.getElementById('g2g-steps-btn').style.display='flex';
+    document.getElementById('g2g-steps').innerHTML=buildGridToGridSteps(lastNavigationResult);
+    updateNavStatusChip('Ready','live');
+    updateMapNavCard(lastNavigationResult);
+    switchScreen('map');
+    setTimeout(()=>{if(map)map.invalidateSize();drawNavigationLeg(start,end,{fit:true});},250);
+  }catch(e){alert(e.message);}
+}
+function removePin(i){if(pins[i]&&pins[i]._m)map.removeLayer(pins[i]._m);pins.splice(i,1);renderHistory();if(!pins.length){setMapInfoVisible(false);document.getElementById('pin-count').textContent='(0)';}}
+function clearHistory(){pins.forEach(p=>{if(p._m)map.removeLayer(p._m);});pins.length=0;renderHistory();setMapInfoVisible(false);routes.forEach(r=>{if(r.layer)map.removeLayer(r.layer);});routes.length=0;clearNavLeg();}
+let activeLayer='osm';
+function setLayer(name){
+  if(!mapReady||!layers[name])return;
+  activeLayer=name;
+  Object.values(layers).forEach(l=>{if(l&&map.hasLayer(l))map.removeLayer(l);});
+  layers[name].addTo(map);
+  ['osm','sat','topo'].forEach(n=>{document.getElementById(`btn-layer-${n}`)?.classList.remove('active-layer');});
+  document.getElementById(`btn-layer-${name}`)?.classList.add('active-layer');
+}
+function fitSheet(){if(mapReady)map.fitBounds(activeSheet.mapBounds,{padding:[20,20]});}
+function isMapFullscreen(){
+  const el=document.getElementById('screen-map');
+  return document.fullscreenElement===el||document.webkitFullscreenElement===el||document.msFullscreenElement===el;
+}
+function handleMapFullscreenChange(){
+  setMapButtonLabel('btn-map-fullscreen',isMapFullscreen()?'Exit':'Full');
+  if(map)setTimeout(()=>map.invalidateSize(),120);
+}
+function toggleMapFullscreen(){
+  const el=document.getElementById('screen-map');
+  if(!el)return;
+  if(isMapFullscreen()){
+    if(document.exitFullscreen)document.exitFullscreen();
+    else if(document.webkitExitFullscreen)document.webkitExitFullscreen();
+    else if(document.msExitFullscreen)document.msExitFullscreen();
+    return;
+  }
+  if(el.requestFullscreen)el.requestFullscreen();
+  else if(el.webkitRequestFullscreen)el.webkitRequestFullscreen();
+  else if(el.msRequestFullscreen)el.msRequestFullscreen();
+}
+function toRad(v){return v*Math.PI/180;}
+function distanceBetween(lat1,lon1,lat2,lon2){const R=6371,dLat=toRad(lat2-lat1),dLon=toRad(lon2-lon1),a=Math.sin(dLat/2)**2+Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2,c=2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));return R*c;}
+function formatDistance(km){if(!isFinite(km))return'—';if(km>=1)return`${km.toFixed(2)} km`;return`${Math.round(km*1000)} m`;}
+function formatMinutes(minutes){if(!isFinite(minutes))return'—';const totalSeconds=Math.round(minutes*60),hours=Math.floor(totalSeconds/3600),mins=Math.floor((totalSeconds%3600)/60),secs=totalSeconds%60;if(hours)return`${hours}h ${String(mins).padStart(2,'0')}m ${String(secs).padStart(2,'0')}s`;if(mins)return`${mins}m ${String(secs).padStart(2,'0')}s`;return`${secs}s`;}
+function formatDurationMs(ms){if(!isFinite(ms)||ms<0)return'—';return formatMinutes(ms/60000);}
+function escapeHtml(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function startUserLocationWatch(opts={}){
+  if(!navigator.geolocation)return;
+  if(userLatLng&&opts.centerOnFound)centerOnUserLocation(opts.zoom||15);
+  if(geoWatchId!==null)return;
+  geoWatchId=navigator.geolocation.watchPosition(pos=>{
+    userLatLng=L.latLng(pos.coords.latitude,pos.coords.longitude);
+    if(mapReady){if(userMarker)userMarker.setLatLng(userLatLng);else userMarker=L.circleMarker(userLatLng,{radius:8,color:'#ffb830',fillColor:'#ffb830',fillOpacity:0.6,weight:2}).addTo(map);if(opts.centerOnFound)centerOnUserLocation(opts.zoom||15);}
+    renderHistory();
+    if(activePin>=0&&pins[activePin])updateInfoBar(pins[activePin]);
+    refreshActiveNavigation();
+  },err=>{if(!opts.quiet)alert(`Location error: ${err.message}`);},{enableHighAccuracy:true,timeout:15000,maximumAge:10000});
+}
+function centerOnUserLocation(zoom=15){if(mapReady&&userLatLng)map.setView(userLatLng,Math.max(map.getZoom(),zoom));}
+function ensureUserLocation(opts={}){startUserLocationWatch(opts);}
+function setNavStartMode(mode){
+  navStartMode=mode;
+  document.getElementById('nav-start-mode-live').classList.toggle('active',mode==='live');
+  document.getElementById('nav-start-mode-grid').classList.toggle('active',mode==='grid');
+  document.getElementById('nav-start-grid-wrap').style.display=mode==='grid'?'':'none';
+  document.getElementById('nav-live-note').textContent=mode==='live'
+    ?'Live start uses your phone GPS as the origin and keeps the navigation leg updated while you move.'
+    :'Manual start uses the grid you type as the origin for route planning and briefing.';
+  document.getElementById('nav-chip-source').textContent=`Start: ${mode==='live'?'Current location':'Manual grid'}`;
+}
+function setNavTravelMode(mode){
+  navTravelMode=mode;
+  document.getElementById('nav-travel-foot').classList.toggle('active',mode==='foot');
+  document.getElementById('nav-travel-vehicle').classList.toggle('active',mode==='vehicle');
+  document.getElementById('nav-chip-travel').textContent=`Mode: ${mode==='foot'?'Foot':'Vehicle'}`;
+  if(lastNavigationResult){
+    const etaMinutes=(lastNavigationResult.distanceKm/NAV_SPEEDS[navTravelMode])*60;
+    lastNavigationResult.etaMinutes=etaMinutes;
+    document.getElementById('g2g-eta').textContent=formatMinutes(etaMinutes);
+  }
+  refreshActiveNavigation();
+}
+function buildStartPointForNavigation(){
+  if(navStartMode==='live'){
+    ensureUserLocation({quiet:false,centerOnFound:false});
+    return resolveLiveStart();
+  }
+  const startGrid=document.getElementById('nav-grid-start').value.trim();
+  return resolveGridReference(startGrid);
+}
+function updateNavStatusChip(label,kind=''){
+  const chip=document.getElementById('nav-chip-state');
+  chip.textContent=label;
+  chip.classList.remove('live','active');
+  if(kind)chip.classList.add(kind);
+}
+function setFloatingNavVisibility(show){
+  const bar=document.getElementById('floating-nav-bar');
+  if(!bar)return;
+  bar.classList.toggle('show',show);
+}
+function setMapNavCardVisibility(show){
+  const card=document.getElementById('map-nav-card');
+  if(!card)return;
+  card.classList.toggle('show',show);
+}
+function setMapNavCardMinimized(minimized){
+  mapNavMinimized=minimized;
+  const card=document.getElementById('map-nav-card');
+  const btn=document.getElementById('map-nav-toggle');
+  if(!card||!btn)return;
+  card.classList.toggle('minimized',minimized);
+  btn.textContent=minimized?'▶':'▼';
+}
+function toggleMapNavCard(){
+  const card=document.getElementById('map-nav-card');
+  if(!card)return;
+  const isVisible=card.classList.contains('show');
+
+  if(!isVisible){
+    // show (expanded)
+    setMapNavCardVisibility(true);
+    setMapNavCardMinimized(false);
+    updateMapNavCard(lastNavigationResult);
+  }else{
+    // hide but keep minimized mode for next open
+    setMapNavCardMinimized(true);
+    setMapNavCardVisibility(false);
+  }
+}
+function updateMapNavCard(nav=lastNavigationResult){
+  const distEl=document.getElementById('map-nav-distance');
+  const timeEl=document.getElementById('map-nav-time');
+  const objectiveEl=document.getElementById('map-nav-objective');
+  const subEl=document.getElementById('map-nav-sub');
+  if(!distEl||!timeEl||!objectiveEl||!subEl)return;
+  if(!nav){
+    distEl.textContent='—';
+    timeEl.textContent='—';
+    objectiveEl.textContent='—';
+    subEl.textContent='No active route built yet.';
+    setMapNavCardVisibility(false);
+    return;
+  }
+  distEl.textContent=activeNavigation?document.getElementById('nav-remaining-distance')?.textContent||formatDistance(nav.distanceKm):formatDistance(nav.distanceKm);
+  timeEl.textContent=formatMinutes(nav.etaMinutes||0);
+  objectiveEl.textContent=formatDistance(nav.distanceKm);
+  subEl.textContent=activeNavigation
+    ?`Navigation running · ${activeNavigation.mode==='live'?'Current location':'Manual grid'}`
+    :'Route ready on map.';
+  setMapNavCardVisibility(true);
+}
+function setFloatingNavMinimized(minimized){
+  floatingNavMinimized=minimized;
+  const bar=document.getElementById('floating-nav-bar');
+  const btn=document.getElementById('floating-nav-toggle');
+  if(!bar||!btn)return;
+  bar.classList.toggle('minimized',minimized);
+  btn.textContent=minimized?'Expand':'Minimize';
+}
+function toggleFloatingNavBar(){setFloatingNavMinimized(!floatingNavMinimized);}
+function updateFloatingNav(distanceText,timeText,bearingText,elapsedText,metaText){
+  document.getElementById('floating-nav-distance').textContent=distanceText;
+  document.getElementById('floating-nav-time').textContent=timeText;
+  document.getElementById('floating-nav-bearing').textContent=bearingText;
+  document.getElementById('floating-nav-elapsed').textContent=elapsedText;
+  document.getElementById('floating-nav-meta').textContent=metaText;
+}
+function maybeAutoMinimizeFloatingNav(current){
+  if(!activeNavigation||activeNavigation.mode!=='live'||!current)return;
+  if(!lastNavPosition){lastNavPosition={...current};return;}
+  const delta=distanceBetween(lastNavPosition.lat,lastNavPosition.lon,current.lat,current.lon);
+  if(delta>=0.01&&!floatingNavMinimized)setFloatingNavMinimized(true);
+  lastNavPosition={...current};
+}
+function normalizeDegrees(deg){return((deg%360)+360)%360;}
+function signedAngleDelta(fromDeg,toDeg){
+  return((toDeg-fromDeg+540)%360)-180;
+}
+function formatTurnInstruction(delta){
+  const abs=Math.abs(delta);
+  if(abs<8)return'Straight';
+  if(abs<25)return`${delta>0?'Right':'Left'} slight`;
+  if(abs<70)return`${delta>0?'Right':'Left'} ${abs.toFixed(0)}°`;
+  return`${delta>0?'Right':'Left'} hard`;
+}
+function setCompassSensorState(message,isActive=false){
+  const el=document.getElementById('compass-sensor-state');
+  if(el)el.textContent=message;
+  const btn=document.getElementById('compass-enable-btn');
+  if(btn)btn.style.display=isActive?'none':'inline-flex';
+}
+function buildCompassDegreeMarks(){
+  const group=document.getElementById('compass-degree-marks');
+  if(!group||group.dataset.ready==='true')return;
+  const center=150;
+  const fragments=[];
+  for(let deg=0;deg<360;deg+=5){
+    const rad=(deg-90)*Math.PI/180;
+    const isMajor=deg%30===0;
+    const outer=126;
+    const inner=isMajor?110:deg%10===0?116:120;
+    const x1=center+Math.cos(rad)*inner;
+    const y1=center+Math.sin(rad)*inner;
+    const x2=center+Math.cos(rad)*outer;
+    const y2=center+Math.sin(rad)*outer;
+    fragments.push(`<line class="${isMajor?'major':''}" x1="${x1.toFixed(2)}" y1="${y1.toFixed(2)}" x2="${x2.toFixed(2)}" y2="${y2.toFixed(2)}"/>`);
+    if(isMajor){
+      const tx=center+Math.cos(rad)*99;
+      const ty=center+Math.sin(rad)*99+4;
+      fragments.push(`<text x="${tx.toFixed(2)}" y="${ty.toFixed(2)}" text-anchor="middle">${deg}</text>`);
+    }
+  }
+  group.innerHTML=fragments.join('');
+  group.dataset.ready='true';
+}
+function getEventHeading(evt){
+  if(typeof evt.webkitCompassHeading==='number'&&isFinite(evt.webkitCompassHeading))return normalizeDegrees(evt.webkitCompassHeading);
+  if(typeof evt.alpha==='number'&&isFinite(evt.alpha))return normalizeDegrees(360-evt.alpha);
+  return null;
+}
+function handleCompassOrientation(evt){
+  const heading=getEventHeading(evt);
+  if(heading===null){
+    setCompassSensorState('No heading data');
+    return;
+  }
+  compassHeading=heading;
+  compassSensorActive=true;
+  compassPermissionState='granted';
+  setCompassSensorState(`${heading.toFixed(0)}° heading`,true);
+  updateCompassUI();
+}
+function startCompassSensor(){
+  if(compassSensorActive)return;
+  if(typeof window.DeviceOrientationEvent==='undefined'){
+    compassPermissionState='unsupported';
+    setCompassSensorState('Compass not supported');
+    return;
+  }
+  if(typeof DeviceOrientationEvent.requestPermission==='function'&&compassPermissionState!=='granted'){
+    setCompassSensorState('Tap enable compass');
+    return;
+  }
+  window.addEventListener('deviceorientation',handleCompassOrientation,true);
+  setCompassSensorState('Compass ready');
+}
+async function requestCompassAccess(){
+  if(typeof window.DeviceOrientationEvent==='undefined'){
+    setCompassSensorState('Compass not supported');
+    return;
+  }
+  try{
+    if(typeof DeviceOrientationEvent.requestPermission==='function'){
+      const response=await DeviceOrientationEvent.requestPermission();
+      compassPermissionState=response;
+      if(response!=='granted'){
+        setCompassSensorState('Permission denied');
+        return;
+      }
+    }
+    startCompassSensor();
+    setCompassSensorState('Move phone to calibrate');
+  }catch(e){
+    setCompassSensorState('Compass unavailable');
+  }
+}
+function getCurrentCompassPositionData(){
+  if(!userLatLng)return null;
+  const lat=userLatLng.lat,lon=userLatLng.lng,latS=Math.abs(lat);
+  const latDMS=dec2dms(latS),lonDMS=dec2dms(lon);
+  const base={
+    lat,lon,latS,lonE:lon,latDMS,lonDMS,
+    latDmsStr:fmtDMS(latDMS.d,latDMS.m,latDMS.s,'S'),
+    lonDmsStr:fmtDMS(lonDMS.d,lonDMS.m,lonDMS.s,'E')
+  };
+  const sheet=findSheetForGeo(latS,lon);
+  if(!sheet)return{...base,gridRef:'Outside loaded sheets',sheetName:'Outside loaded sheets'};
+  try{
+    const resolved=doGeoToGridOnSheet(latS,lon,sheet);
+    return{
+      ...base,
+      gridRef:resolved.gridRef,
+      sheetName:sheet.name,
+      stdE:resolved.stdE,
+      stdN:resolved.stdN
+    };
+  }catch{
+    return{...base,gridRef:'Outside loaded sheets',sheetName:sheet.name};
+  }
+}
+function setCompassBearing(targetBearing,heading=null){
+  const needle=document.getElementById('compass-needle-group');
+  const line=document.getElementById('compass-bearing-line');
+  const dial=document.getElementById('compass-dial-group');
+  const bearingDisplay=document.getElementById('compass-bearing-display');
+  const headingDisplay=document.getElementById('compass-heading-display');
+  const dirDisplay=document.getElementById('compass-direction-display');
+  const resolvedTarget=isFinite(targetBearing)?normalizeDegrees(targetBearing):0;
+  const resolvedHeading=isFinite(heading)?normalizeDegrees(heading):null;
+  const relative=resolvedHeading===null?resolvedTarget:normalizeDegrees(resolvedTarget-resolvedHeading);
+  if(dial){
+    const dialTransform=`rotate(${-1*(resolvedHeading??0)} 150 150)`;
+    dial.setAttribute('transform',dialTransform);
+    dial.style.transform=`rotate(${-1*(resolvedHeading??0)}deg)`;
+  }
+  const transformValue=`rotate(${relative} 150 150)`;
+  const cssTransformValue=`rotate(${relative}deg)`;
+  if(needle){
+    needle.setAttribute('transform', transformValue);
+    needle.style.visibility='visible';
+    needle.style.transformOrigin='center center';
+    needle.style.transformBox='view-box';
+    needle.style.transform=cssTransformValue;
+  }
+  if(line){
+    line.setAttribute('transform', transformValue);
+    line.style.visibility='visible';
+    line.style.transformOrigin='center center';
+    line.style.transformBox='view-box';
+    line.style.transform=cssTransformValue;
+  }
+  if(bearingDisplay)bearingDisplay.textContent=formatBearing(resolvedTarget);
+  if(headingDisplay)headingDisplay.textContent=resolvedHeading===null?'Sensor off':formatBearing(resolvedHeading);
+  if(dirDisplay)dirDisplay.textContent=resolvedHeading===null?'Enable sensor':formatTurnInstruction(signedAngleDelta(resolvedHeading,resolvedTarget));
+}
+
+function setCompassArrivalState(arrived){
+  const messageEl=document.getElementById('compass-message');
+  const endBtn=document.getElementById('compass-end-nav-btn');
+  if(messageEl){
+    messageEl.textContent=arrived
+      ?'You have arrived at destination — tap END NAVIGATION.'
+      :'Follow the needle towards your destination. Distance updates as you move.';
+  }
+  if(endBtn){
+    endBtn.style.display=arrived?'inline-flex':'none';
+  }
+}
+
+function updateCompassDuringNavigation(){
+  const nav=activeNavigation;
+  if(!nav)return;
+
+  const current = (nav.mode==='live' && userLatLng) ? {lat:userLatLng.lat,lon:userLatLng.lng} : nav.start;
+  const remainingKm=distanceBetween(current.lat,current.lon,nav.end.lat,nav.end.lon);
+  const bearing= bearingBetween(current.lat,current.lon,nav.end.lat,nav.end.lon);
+  const etaMinutes=(remainingKm/NAV_SPEEDS[nav.travelMode])*60;
+
+  setCompassBearing(bearing,compassHeading);
+  const remainingEl=document.getElementById('compass-remaining');
+  const etaEl=document.getElementById('compass-eta');
+  if(remainingEl)remainingEl.textContent=formatDistance(remainingKm);
+  if(etaEl)etaEl.textContent=formatMinutes(etaMinutes);
+
+  const distanceHead=document.getElementById('compass-distance');
+  if(distanceHead)distanceHead.textContent=formatDistance(nav.distanceKm);
+  const objectiveTitle=document.getElementById('compass-objective-title');
+  const objectiveSubtitle=document.getElementById('compass-objective-subtitle');
+  if(objectiveTitle)objectiveTitle.textContent=nav.objectiveName||'Unnamed pin';
+  if(objectiveSubtitle)objectiveSubtitle.textContent='Objective';
+  const destinationHead=document.getElementById('compass-destination');
+  if(destinationHead)destinationHead.textContent=nav.end?.gridRef?`GR ${nav.end.gridRef}`:'—';
+  const destinationCoords=document.getElementById('compass-destination-coords');
+  const targetDms=document.getElementById('compass-target-dms');
+  if(destinationCoords)destinationCoords.textContent=nav.endDms;
+  if(targetDms)targetDms.textContent=nav.endDms;
+  const liveData=getCurrentCompassPositionData();
+  const liveCoords=document.getElementById('compass-live-coords');
+  const liveGrid=document.getElementById('compass-live-grid');
+  if(liveCoords)liveCoords.textContent=liveData?`${liveData.latDmsStr} · ${liveData.lonDmsStr}`:'Waiting for location…';
+  if(liveGrid)liveGrid.textContent=liveData?`${liveData.gridRef} · ${liveData.sheetName}`:(nav.mode==='grid'?`${nav.start.gridRef} · ${nav.start.sheet.name}`:'Waiting for location…');
+
+  const arrived = remainingKm <= 0.003;
+  setCompassArrivalState(arrived);
+  if(arrived && !compassArrivalNotified){
+    compassArrivalNotified=true;
+    setTimeout(()=>alert('You have arrived at destination.'), 50);
+  }
+}
+
+function updateCompassUI(){
+  const nav = activeNavigation || lastNavigationResult;
+  const noNav = !activeNavigation && !lastNavigationResult;
+  const noNavEl = document.getElementById('compass-no-nav');
+  if(noNavEl) noNavEl.style.display = noNav ? 'flex' : 'none';
+
+  if(!nav){
+    setCompassBearing(0,compassHeading);
+    document.getElementById('compass-objective-title').textContent='Name pending';
+    document.getElementById('compass-objective-subtitle').textContent='Objective';
+    document.getElementById('compass-destination').textContent='—';
+    document.getElementById('compass-destination-coords').textContent='—';
+    document.getElementById('compass-distance').textContent='—';
+    document.getElementById('compass-remaining').textContent='—';
+    document.getElementById('compass-eta').textContent='—';
+    document.getElementById('compass-target-dms').textContent='—';
+    document.getElementById('compass-live-grid').textContent='—';
+    document.getElementById('compass-live-coords').textContent='Waiting for location…';
+    setCompassArrivalState(false);
+    return;
+  }
+
+  document.getElementById('compass-objective-title').textContent=nav.objectiveName||'Unnamed pin';
+  document.getElementById('compass-objective-subtitle').textContent='Objective';
+  document.getElementById('compass-destination').textContent=nav.end?.gridRef?`GR ${nav.end.gridRef}`:'—';
+  document.getElementById('compass-distance').textContent=formatDistance(nav.distanceKm||0);
+  document.getElementById('compass-destination-coords').textContent=nav.endDms||'—';
+  document.getElementById('compass-target-dms').textContent=nav.endDms||'—';
+
+  if(activeNavigation){
+    updateCompassDuringNavigation();
+  } else {
+    const remainingKm = distanceBetween(nav.start.lat,nav.start.lon,nav.end.lat,nav.end.lon);
+    const bearing = bearingBetween(nav.start.lat,nav.start.lon,nav.end.lat,nav.end.lon);
+    setCompassBearing(bearing,compassHeading);
+    document.getElementById('compass-remaining').textContent=formatDistance(remainingKm);
+    document.getElementById('compass-eta').textContent=formatMinutes((remainingKm/NAV_SPEEDS[nav.travelMode])*60 || 0);
+    const liveData=getCurrentCompassPositionData();
+    document.getElementById('compass-live-coords').textContent=liveData?`${liveData.latDmsStr} · ${liveData.lonDmsStr}`:`Start point preview`;
+    document.getElementById('compass-live-grid').textContent=liveData?`${liveData.gridRef} · ${liveData.sheetName}`:`${nav.start.gridRef} · ${nav.start.sheet.name}`;
+    setCompassArrivalState(remainingKm <= 0.003);
+  }
+}
+
+function renameCompassObjective(){
+  const nav=activeNavigation||lastNavigationResult;
+  if(!nav||!nav.end)return;
+  const currentName=nav.objectiveName&&nav.objectiveName!=='Objective'?nav.objectiveName:'';
+  const nextName=prompt('Pin name',currentName);
+  if(nextName===null)return;
+  const trimmed=nextName.trim();
+  const finalName=trimmed||'Objective';
+  nav.objectiveName=finalName;
+  if(nav.end)nav.end.name=finalName;
+  if(lastNavigationResult){
+    lastNavigationResult.objectiveName=finalName;
+    if(lastNavigationResult.end)lastNavigationResult.end.name=finalName;
+  }
+  if(activeNavigation){
+    activeNavigation.objectiveName=finalName;
+    if(activeNavigation.end)activeNavigation.end.name=finalName;
+  }
+  const pin=pins.find(p=>p.gridRef===nav.end.gridRef&&Math.abs(p.lat-nav.end.lat)<0.00001&&Math.abs(p.lon-nav.end.lon)<0.00001);
+  if(pin){
+    pin.name=finalName;
+    renderHistory();
+    if(activePin>=0&&pins[activePin]===pin)updateInfoBar(pin);
+  }
+  updateCompassUI();
+}
+
+function refreshActiveNavigation(){
+  if(!activeNavigation)return;
+  const nav=activeNavigation;
+  const current=(nav.mode==='live'&&userLatLng)?{lat:userLatLng.lat,lon:userLatLng.lng}:nav.start;
+  const remainingKm=distanceBetween(current.lat,current.lon,nav.end.lat,nav.end.lon);
+  const bearing=bearingBetween(current.lat,current.lon,nav.end.lat,nav.end.lon);
+  const etaMinutes=(remainingKm/NAV_SPEEDS[nav.travelMode])*60;
+  const distanceText=formatDistance(remainingKm);
+  const timeText=formatMinutes(etaMinutes);
+  const bearingText=formatBearing(bearing);
+  const elapsedText=formatDurationMs(Date.now()-nav.startedAt);
+  document.getElementById('nav-remaining-distance').textContent=distanceText;
+  document.getElementById('nav-remaining-time').textContent=timeText;
+  document.getElementById('nav-current-bearing').textContent=bearingText;
+  document.getElementById('nav-elapsed').textContent=elapsedText;
+  updateFloatingNav(distanceText,timeText,bearingText,elapsedText,`${nav.mode==='live'?'Current location':'Manual grid'} · ${nav.travelMode==='foot'?'Foot':'Vehicle'}`);
+  document.getElementById('map-nav-distance').textContent=distanceText;
+  document.getElementById('map-nav-time').textContent=timeText;
+  document.getElementById('map-nav-objective').textContent=formatDistance(nav.distanceKm);
+  document.getElementById('map-nav-sub').textContent=`Navigation running · ${nav.mode==='live'?'Current location':'Manual grid'}`;
+  maybeAutoMinimizeFloatingNav(current);
+  if(mapReady&&current&&nav.end)drawNavigationLeg({...nav.start,lat:current.lat,lon:current.lon,gridRef:nav.mode==='live'?'LIVE POSITION':nav.start.gridRef,sheet:nav.start.sheet},nav.end,{fit:false});
+
+  // Compass live updates (rotate needle + show remaining/ETA)
+  updateCompassDuringNavigation();
+  // ensure compass needle updates even if user stayed on compass screen
+  if(currentScreen==='compass') updateCompassUI();
+  else {
+    // keep compass needle visible for next compass open
+    updateCompassUI();
+  }
+
+  if(remainingKm<=0.03){
+    updateNavStatusChip('Arrived','active');
+    updateFloatingNav(distanceText,'Arrived',bearingText,elapsedText,'Destination reached');
+  }
+}
+function startNavigation(){
+  if(!lastNavigationResult){showErr('g2g','Build a navigation leg first.');return;}
+  startCompassSensor();
+  activeNavigation={...lastNavigationResult,start:lastNavigationResult.start,end:lastNavigationResult.end,mode:navStartMode,travelMode:navTravelMode,startedAt:Date.now()};
+  compassArrivalNotified=false;
+  updateNavStatusChip(activeNavigation.mode==='live'?'Live navigation':'Manual navigation','active');
+  document.getElementById('nav-chip-source').textContent=`Start: ${activeNavigation.mode==='live'?'Current location':'Manual grid'}`;
+  document.getElementById('nav-chip-travel').textContent=`Mode: ${activeNavigation.travelMode==='foot'?'Foot':'Vehicle'}`;
+  if(navTicker)clearInterval(navTicker);
+  lastNavPosition=null;
+  setFloatingNavVisibility(true);
+  setFloatingNavMinimized(false);
+  setMapNavCardVisibility(true);
+  setMapNavCardMinimized(false);
+  updateMapNavCard(lastNavigationResult);
+  navTicker=setInterval(refreshActiveNavigation,1000);
+  refreshActiveNavigation();
+  showGridNavigationOnMap();
+  switchScreen('compass');
+  // Ensure the compass SVG is visible/painted before rotating the needle.
+  setTimeout(()=>updateCompassUI(),0);
+  setTimeout(()=>updateCompassUI(),150);
+}
+
+function endNavigation(){
+  activeNavigation=null;
+  compassArrivalNotified=false;
+  if(navTicker)clearInterval(navTicker);
+  navTicker=null;
+  updateNavStatusChip('Idle');
+  document.getElementById('nav-remaining-distance').textContent='—';
+  document.getElementById('nav-remaining-time').textContent='—';
+  document.getElementById('nav-current-bearing').textContent='—';
+  document.getElementById('nav-elapsed').textContent='—';
+  lastNavPosition=null;
+  setFloatingNavVisibility(false);
+  updateFloatingNav('—','—','—','—','Idle');
+  updateMapNavCard(lastNavigationResult);
+  clearNavLeg();
+  setCompassArrivalState(false);
+  const endBtn=document.getElementById('compass-end-nav-btn');
+  if(endBtn)endBtn.style.display='none';
+  updateCompassUI();
+}
+function toggleRuler(){
+  if(!mapReady)return;
+  rulerMode=!rulerMode;
+  const btn=document.getElementById('btn-ruler');
+  btn?.classList.toggle('active-layer',rulerMode);
+  const output=document.getElementById('ruler-output');
+  output.style.display='block';
+  if(rulerMode){map.getContainer().style.cursor='crosshair';output.textContent=userLatLng?'Ruler active · tap map.':'Ruler · waiting for location.';map.on('mousemove',e=>{if(!rulerMode||!userLatLng)return;const current=e.latlng;const seg=[[userLatLng.lat,userLatLng.lng],[current.lat,current.lng]];if(rulerLine)rulerLine.setLatLngs(seg);else rulerLine=L.polyline(seg,{color:'#00c4ff',weight:3}).addTo(map);if(pointerCircle)pointerCircle.setLatLng(current);else pointerCircle=L.circleMarker(current,{radius:5,color:'#00c9ff',fillColor:'#00c9ff',fillOpacity:0.8}).addTo(map);const km=(map.distance(userLatLng,current)/1000).toFixed(2);if(rulerTooltip)rulerTooltip.setLatLng(current).setContent(`${km} km`);else rulerTooltip=L.tooltip({permanent:true,direction:'right',offset:[12,0],className:'ruler-tooltip'}).setLatLng(current).setContent(`${km} km`).addTo(map);output.textContent=`Distance: ${km} km`;});}
+  else{map.getContainer().style.cursor='';map.off('mousemove');if(rulerLine)map.removeLayer(rulerLine);if(pointerCircle)map.removeLayer(pointerCircle);if(rulerTooltip)map.removeLayer(rulerTooltip);rulerLine=pointerCircle=rulerTooltip=null;output.textContent='Ruler off.';setTimeout(()=>output.style.display='none',2000);}
+}
+function togglePinForRoute(id,checked){const pin=pins.find(p=>p.id===id);if(pin)pin.forRoute=checked;}
+function createRoute(){const selected=pins.filter(p=>p.forRoute);if(selected.length<2){alert('Select at least two pins for a route.');return;}const name=prompt('Route name',`Route ${routes.length+1}`);if(!name)return;const latlngs=selected.map(p=>L.latLng(p.lat,p.lon));let totalMeters=0;for(let i=1;i<latlngs.length;i++)totalMeters+=map.distance(latlngs[i-1],latlngs[i]);const totalKm=totalMeters/1000;const routeLayer=L.polyline(latlngs,{color:'#ff9d1a',weight:4,dashArray:'8 4',opacity:.9}).addTo(map);if(!routesVisible)map.removeLayer(routeLayer);routes.push({id:`route-${Date.now()}`,name,points:selected,totalDistance:totalKm.toFixed(2),totalKm,estimatedDayMinutes:totalKm*MINUTES_PER_KM_DAY,estimatedNightMinutes:totalKm*MINUTES_PER_KM_NIGHT,layer:routeLayer});selected.forEach(p=>p.forRoute=false);renderHistory();}
+function toggleRoutesVisibility(){if(!routes.length)return;routesVisible=!routesVisible;document.getElementById('btn-route-toggle').textContent=routesVisible?'Hide Routes':'Show Routes';routes.forEach(r=>{if(r.layer){if(routesVisible)r.layer.addTo(map);else if(map.hasLayer(r.layer))map.removeLayer(r.layer);}});}
+function buildReportCSV(rows){const csv=rows.map(row=>row.map(cell=>`"${String(cell||'').replace(/"/g,'""')}"`).join(',')).join('\r\n');const blob=new Blob([csv],{type:'text/csv;charset=UTF-8'});return URL.createObjectURL(blob);}
+
+function generateReport(){
+  if(!pins.length){alert('No pins to report.');return;}
+  const pinHeader=['Name','Grid Ref','Lat (DMS)','Lon (DMS)','Latitude','Longitude'];
+  const pinRows=pins.map(p=>[escapeHtml(p.name),p.gridRef,p.latDMSstr,p.lonDMSstr,`${p.lat.toFixed(6)}`,`${p.lon.toFixed(6)}`]);
+  const csvRows=[[...pinHeader],...pinRows];
+  let routeSectionHtml='';
+  if(routes.length){
+    csvRows.push([],['[ROUTES]'],['Route Name','Distance (km)','Day Time','Night Time','Points']);
+    const maxPins=Math.max(...routes.map(r=>r.points.length));
+    routes.forEach(route=>{csvRows.push([escapeHtml(route.name),route.totalDistance,formatMinutes(route.estimatedDayMinutes),formatMinutes(route.estimatedNightMinutes),escapeHtml(route.points.map(p=>p.name).join(' -> '))]);for(let i=1;i<route.points.length;i++){const from=route.points[i-1],to=route.points[i],distance=distanceBetween(from.lat,from.lon,to.lat,to.lon);csvRows.push(['Segment',`${from.name} -> ${to.name}`,distance.toFixed(2),formatMinutes(distance*MINUTES_PER_KM_DAY),formatMinutes(distance*MINUTES_PER_KM_NIGHT)]);}});
+    const routeRows=routes.map((route,index)=>{const pinCells=[];for(let pi=0;pi<maxPins;pi++){const pin=route.points[pi];if(!pin){pinCells.push(`<td style='color:rgba(255,255,255,.3);text-align:center'>—</td>`);continue;}pinCells.push(`<td style='font-size:11px;line-height:1.4'><strong>${escapeHtml(pin.name)}</strong><br>GR ${pin.gridRef}<br>${pin.latDMSstr}<br>${pin.lonDMSstr}</td>`);}const totalCell=`<strong>${route.totalDistance} km</strong><br>Day ${formatMinutes(route.estimatedDayMinutes)}<br>Night ${formatMinutes(route.estimatedNightMinutes)}`;return`<tr><td>${index+1}</td>${pinCells.join('')}<td style='white-space:pre-line;font-weight:500'>${totalCell}</td></tr>`;}).join('');routeSectionHtml=`<section style='margin-top:32px'><h2 style='font-family:var(--mono);font-size:14px;color:#00c9a7;margin-bottom:12px'>Routes</h2><table style='width:100%;border-collapse:collapse'><thead><tr><th>S/N</th>${Array.from({length:Math.max(...routes.map(r=>r.points.length))},(_,i)=>`<th>Pin ${i+1}</th>`).join('')}<th>Total</th></tr></thead><tbody>${routeRows}</tbody></table></section>`;}
+  const csvUrl=buildReportCSV(csvRows);
+  const tableRows=pinRows.map(row=>`<tr>${row.map(cell=>`<td>${cell}</td>`).join('')}</tr>`).join('');
+  const tableHtml=`<table style='width:100%;border-collapse:collapse;margin-top:20px'><thead><tr>${pinHeader.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${tableRows}</tbody></table>`;
+  const reportWindow=window.open('','_blank');
+  if(!reportWindow){URL.revokeObjectURL(csvUrl);alert('Popup blocked.');return;}
+  reportWindow.document.write(`<!doctype html><html><head><title>Pin Report</title><style>body{background:#0a0c0a;color:#c8e8c8;font-family:'Rajdhani',sans-serif;padding:20px;font-size:14px}h1{font-family:'Share Tech Mono',monospace;text-transform:uppercase;letter-spacing:1.5px;color:#39ff6a;margin-bottom:8px}table{width:100%;border-collapse:collapse;margin-top:20px}th,td{border:1px solid rgba(255,255,255,.15);padding:8px;font-size:12px;text-align:left;vertical-align:top}th{background:rgba(57,255,106,.15);color:#fff}a{display:inline-flex;align-items:center;margin-top:16px;padding:8px 14px;border:1px solid #39ff6a;color:#39ff6a;text-decoration:none;letter-spacing:1px}</style></head><body><h1>Pin Report</h1><a href='${csvUrl}' download='pin-report.csv'>⬇ Download CSV</a>${tableHtml}${routeSectionHtml}</body></html>`);
+  reportWindow.document.close();
+  reportWindow.addEventListener('beforeunload',()=>URL.revokeObjectURL(csvUrl),{once:true});
+}
+
+// ── CONVERTERS ──
+let currentMode='dms';
+function setMode(m){currentMode=m;document.getElementById('dec-inputs').style.display=m==='dec'?'':'none';document.getElementById('dms-inputs').style.display=m==='dms'?'':'none';document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active'));document.getElementById(`mode-${m}`).classList.add('active');}
+function clearErr(t){const el=document.getElementById(`${t}-err`);el.textContent='';el.classList.remove('show');}
+function showErr(t,msg){const el=document.getElementById(`${t}-err`);el.textContent='⚠ '+msg;el.classList.add('show');}
+
+function convertGrid(){
+  try{
+    const v=document.getElementById('grid-input').value.trim();
+    const r=resolveGridReference(v);
+    if(r.sheet.id!==activeSheet.id)selectSheet(r.sheet.id);
+    document.getElementById('out-lat-dms').innerHTML=renderDmsOutput(r.latDMS.d,r.latDMS.m,r.latDMS.s,'S');
+    document.getElementById('out-lon-dms').innerHTML=renderDmsOutput(r.lonDMS.d,r.lonDMS.m,r.lonDMS.s,'E');
+    document.getElementById('out-lat-dec').textContent=`-${r.latS.toFixed(8)}°`;
+    document.getElementById('out-lon-dec').textContent=`${r.lon.toFixed(8)}°`;
+    if(userLatLng){const km=distanceBetween(userLatLng.lat,userLatLng.lng,r.lat,r.lon);document.getElementById('out-distance').textContent=formatDistance(km);}else{document.getElementById('out-distance').textContent='—';}
+    document.getElementById('g2c-prec').textContent=`[${r.sheet.name}] TM: E=${r.stdE.toFixed(2)} m  N=${r.stdN.toFixed(2)} m`;
+    document.getElementById('g2c-result').classList.add('show');
+    document.getElementById('g2c-steps-btn').style.display='flex';
+    document.getElementById('g2c-err').classList.remove('show');
+    // Steps
+    document.getElementById('g2c-steps').innerHTML=buildGridToGeoSteps(r,v);
+    lastResult={gridRef:r.gridRef,latS:r.latS,lonE:r.lon,lat:r.lat,lon:r.lon,latDMSstr:fmtDMS(r.latDMS.d,r.latDMS.m,r.latDMS.s,'S'),lonDMSstr:fmtDMS(r.lonDMS.d,r.lonDMS.m,r.lonDMS.s,'E'),stdE:r.stdE,stdN:r.stdN,src:'grid',name:'Conversion result',sheet:r.sheet.name};
+    updateGoogleLinks(lastResult);
+    document.getElementById('g2c-map-btn').classList.add('visible');
+  }catch(e){showErr('g2c',e.message);}
+}
+
+function convertGeo(){
+  try{
+    let latS,lonE;
+    if(currentMode==='dec'){latS=parseFloat(document.getElementById('dec-lat').value);lonE=parseFloat(document.getElementById('dec-lon').value);if(isNaN(latS)||isNaN(lonE))throw new Error('Enter valid decimal degrees');}
+    else{latS=dms2dec(+document.getElementById('dms-lat-d').value||0,+document.getElementById('dms-lat-m').value||0,+document.getElementById('dms-lat-s').value||0);lonE=dms2dec(+document.getElementById('dms-lon-d').value||0,+document.getElementById('dms-lon-m').value||0,+document.getElementById('dms-lon-s').value||0);}
+    const matchedSheet=findSheetForGeo(latS,lonE);
+    if(!matchedSheet)throw new Error('Coordinates are outside all loaded sheets');
+    if(matchedSheet.id!==activeSheet.id)selectSheet(matchedSheet.id);
+    const r=doGeoToGrid(latS,lonE);
+    document.getElementById('out-gridref').textContent=r.gridRef;
+    document.getElementById('out-ge-raw').textContent=r.gE_raw.toFixed(4);
+    document.getElementById('out-gn-raw').textContent=r.gN_raw.toFixed(4);
+    document.getElementById('out-tm-e').textContent=`${r.stdE.toFixed(2)} m`;
+    document.getElementById('out-tm-n').textContent=`${r.stdN.toFixed(2)} m`;
+    document.getElementById('c2g-prec').textContent=`[${activeSheet.name}] Raw gE=${r.gE_raw.toFixed(4)} → ${r.gE}  gN=${r.gN_raw.toFixed(4)} → ${r.gN}`;
+    document.getElementById('c2g-result').classList.add('show');
+    document.getElementById('c2g-steps-btn').style.display='flex';
+    document.getElementById('c2g-err').classList.remove('show');
+    document.getElementById('c2g-steps').innerHTML=buildGeoToGridSteps(r);
+    lastResult={gridRef:r.gridRef,latS,lonE,lat:-latS,lon:lonE,latDMSstr:fmtDMS(r.latDMS.d,r.latDMS.m,r.latDMS.s,'S'),lonDMSstr:fmtDMS(r.lonDMS.d,r.lonDMS.m,r.lonDMS.s,'E'),stdE:r.stdE,stdN:r.stdN,src:'geo',name:'Conversion result',sheet:activeSheet.name};
+    updateGoogleLinks(lastResult);
+    document.getElementById('c2g-map-btn').classList.add('visible');
+  }catch(e){showErr('c2g',e.message);}
+}
+
+function buildGridToGeoSteps(r,v){return`<b>1.</b> Grid Ref: ${v} → gE=${r.gE}, gN=${r.gN}<br><b>2.</b> stdE = ${r.sheet.baseE} + ${r.gE}×100 = <b>${r.stdE.toFixed(2)} m</b><br><b>3.</b> stdN = ${r.sheet.baseN} + ${r.gN}×100 = <b>${r.stdN.toFixed(2)} m</b><br><b>4.</b> TM Inverse → Lat = ${r.lat.toFixed(8)}°, Lon = ${r.lon.toFixed(8)}°<br><b>5.</b> Lat (S): ${fmtDMS(r.latDMS.d,r.latDMS.m,r.latDMS.s,'S')}<br><b>6.</b> Lon (E): ${fmtDMS(r.lonDMS.d,r.lonDMS.m,r.lonDMS.s,'E')}`;}
+function buildGeoToGridSteps(r){return`<b>1.</b> Input: ${r.latS.toFixed(8)}°S, ${r.lonE.toFixed(8)}°E<br><b>2.</b> TM Forward → stdE=${r.stdE.toFixed(2)} m, stdN=${r.stdN.toFixed(2)} m<br><b>3.</b> gE_raw = (${r.stdE.toFixed(2)} − ${activeSheet.baseE}) / 100 = <b>${r.gE_raw.toFixed(4)}</b><br><b>4.</b> gN_raw = (${r.stdN.toFixed(2)} − ${activeSheet.baseN}) / 100 = <b>${r.gN_raw.toFixed(4)}</b><br><b>5.</b> Round → gE=${r.gE}, gN=${r.gN}<br><b>6.</b> Grid Ref: <b>${r.gridRef}</b>`;}
+function buildGridToGridSteps(nav){
+  return`<b>1.</b> Start point ${nav.startLabel} → ${nav.start.lat.toFixed(8)}°, ${nav.start.lon.toFixed(8)}°<br><b>2.</b> Destination grid ${nav.end.gridRef} on <b>${nav.end.sheet.name}</b> → ${nav.end.lat.toFixed(8)}°, ${nav.end.lon.toFixed(8)}°<br><b>3.</b> Geodesic distance = <b>${nav.distanceKm.toFixed(3)} km</b><br><b>4.</b> Estimated time (${navTravelMode}) = <b>${formatMinutes(nav.etaMinutes)}</b><br><b>5.</b> Initial bearing = <b>${formatBearing(nav.bearing)}</b><br><b>6.</b> ${isFinite(nav.start.stdE)&&isFinite(nav.end.stdE)?`TM movement vector = <b>${buildNavVector(nav.start,nav.end)}</b>`:'TM vector unavailable because live start is outside loaded sheets'}`;}
+
+let lastNavigationResult=null;
+function convertGridToGrid(){
+  try{
+    const start=buildStartPointForNavigation();
+    const startLabel=navStartMode==='live'?start.label:`${start.sheet.name} · GR ${start.gridRef}`;
+    const endGrid=document.getElementById('nav-grid-end').value.trim();
+    const end=resolveGridReference(endGrid);
+    const distanceKm=distanceBetween(start.lat,start.lon,end.lat,end.lon);
+    const bearing=bearingBetween(start.lat,start.lon,end.lat,end.lon);
+    const backBearing=(bearing+180)%360;
+    const startDms=`${fmtDMS(start.latDMS.d,start.latDMS.m,start.latDMS.s,'S')} · ${fmtDMS(start.lonDMS.d,start.lonDMS.m,start.lonDMS.s,'E')}`;
+    const endDms=`${fmtDMS(end.latDMS.d,end.latDMS.m,end.latDMS.s,'S')} · ${fmtDMS(end.lonDMS.d,end.lonDMS.m,end.lonDMS.s,'E')}`;
+    const etaMinutes=(distanceKm/NAV_SPEEDS[navTravelMode])*60;
+    lastNavigationResult={start,end,distanceKm,bearing,backBearing,startDms,endDms,etaMinutes,startLabel,objectiveName:end.name||'Objective'};
+    document.getElementById('g2g-start').textContent=startLabel;
+    document.getElementById('g2g-end').textContent=`${end.sheet.name} · GR ${end.gridRef}`;
+    document.getElementById('g2g-start-coords').innerHTML=`${startDms}<br>${start.lat.toFixed(6)}, ${start.lon.toFixed(6)}`;
+    document.getElementById('g2g-end-coords').innerHTML=`${endDms}<br>${end.lat.toFixed(6)}, ${end.lon.toFixed(6)}`;
+    document.getElementById('g2g-distance').textContent=formatDistance(distanceKm);
+    document.getElementById('g2g-eta').textContent=formatMinutes(etaMinutes);
+    document.getElementById('g2g-bearing').textContent=formatBearing(bearing);
+    document.getElementById('g2g-back-bearing').textContent=formatBearing(backBearing);
+    document.getElementById('g2g-vector').textContent=isFinite(start.stdE)&&isFinite(end.stdE)?buildNavVector(start,end):'Unavailable outside loaded sheets';
+    document.getElementById('g2g-prec').textContent=`Start TM ${isFinite(start.stdE)?start.stdE.toFixed(2):'—'} / ${isFinite(start.stdN)?start.stdN.toFixed(2):'—'} · Destination TM ${end.stdE.toFixed(2)} / ${end.stdN.toFixed(2)}`;
+    document.getElementById('g2g-google-link').href=googleMapsDirectionsUrl(start.lat,start.lon,end.lat,end.lon);
+    document.getElementById('g2g-result').classList.add('show');
+    document.getElementById('g2g-steps-btn').style.display='flex';
+    document.getElementById('g2g-steps').innerHTML=buildGridToGridSteps(lastNavigationResult);
+    document.getElementById('g2g-err').classList.remove('show');
+    updateNavStatusChip('Ready','live');
+    updateMapNavCard(lastNavigationResult);
+  }catch(e){showErr('g2g',e.message);}
+}
+
+function toggleSteps(t){const b=document.getElementById(`${t}-steps-btn`),x=document.getElementById(`${t}-steps`);b.classList.toggle('open',x.classList.toggle('show'));}
+
+function copyResult(t){
+  const btn=document.getElementById(`${t}-copy`);
+  let txt='';
+  if(t==='g2c')txt=`Lat: ${document.getElementById('out-lat-dms').textContent} (${document.getElementById('out-lat-dec').textContent})\nLon: ${document.getElementById('out-lon-dms').textContent} (${document.getElementById('out-lon-dec').textContent})\nDistance: ${document.getElementById('out-distance').textContent}`;
+  else if(t==='g2g')txt=`Start: ${document.getElementById('g2g-start').textContent}\nDestination: ${document.getElementById('g2g-end').textContent}\nDistance: ${document.getElementById('g2g-distance').textContent}\nETA: ${document.getElementById('g2g-eta').textContent}\nBearing: ${document.getElementById('g2g-bearing').textContent}\nBack Bearing: ${document.getElementById('g2g-back-bearing').textContent}`;
+  else txt=`Grid Ref: ${document.getElementById('out-gridref').textContent}\nTM E: ${document.getElementById('out-tm-e').textContent}\nTM N: ${document.getElementById('out-tm-n').textContent}`;
+  navigator.clipboard.writeText(txt).then(()=>{btn.textContent='✓ COPIED';btn.classList.add('copied');setTimeout(()=>{btn.textContent='⧉ COPY';btn.classList.remove('copied');},1800);});
+}
+
+function searchMapPoint(){
+  if(!ensureLeaflet()){alert('Map features are unavailable while offline.');return;}
+  try{
+    const input=document.getElementById('map-search-input');
+    const query=input?.value.trim()||'';
+    const result=resolveMapSearch(query);
+    if(result.sheet.id!==activeSheet.id)selectSheet(result.sheet.id);
+    switchScreen('map');
+    setTimeout(()=>{
+      if(map)map.invalidateSize();
+      const pinName=/^\d{6}$/.test(query)?`Search ${result.gridRef}`:`Search ${fmtDMS(result.latDMS.d,result.latDMS.m,result.latDMS.s,'S')} · ${fmtDMS(result.lonDMS.d,result.lonDMS.m,result.lonDMS.s,'E')}`;
+      addPin({
+        gridRef:result.gridRef,
+        latS:result.latS,
+        lonE:result.lon,
+        lat:result.lat,
+        lon:result.lon,
+        latDMSstr:fmtDMS(result.latDMS.d,result.latDMS.m,result.latDMS.s,'S'),
+        lonDMSstr:fmtDMS(result.lonDMS.d,result.lonDMS.m,result.lonDMS.s,'E'),
+        stdE:result.stdE,
+        stdN:result.stdN,
+        src:'search',
+        name:pinName,
+        sheet:result.sheet.name
+      });
+      map.setView([result.lat,result.lon],Math.max(map.getZoom(),15));
+    },250);
+  }catch(e){
+    alert(e.message);
+  }
+}
+
+function goToMap(){if(!lastResult)return;if(!ensureLeaflet()){alert('Map features are unavailable while offline.');return;}switchScreen('map');setTimeout(()=>{if(map)map.invalidateSize();addPin({...lastResult});},250);}
+function showGridNavigationOnMap(){
+  if(!ensureLeaflet()){alert('Map features are unavailable while offline.');return;}
+  if(!lastNavigationResult)return;
+  const focusSheet=lastNavigationResult.start.sheet.id===lastNavigationResult.end.sheet.id?lastNavigationResult.start.sheet.id:lastNavigationResult.start.sheet.id;
+  if(focusSheet!==activeSheet.id)selectSheet(focusSheet);
+  switchScreen('map');
+  setTimeout(()=>{
+    if(map)map.invalidateSize();
+    updateMapNavCard(lastNavigationResult);
+    if(activeNavigation&&activeNavigation.mode==='live'&&userLatLng){
+      drawNavigationLeg({...activeNavigation.start,lat:userLatLng.lat,lon:userLatLng.lng,gridRef:'LIVE POSITION',sheet:activeNavigation.start.sheet},activeNavigation.end,{fit:true});
+      return;
+    }
+    drawNavigationLeg(lastNavigationResult.start,lastNavigationResult.end,{fit:true});
+  },250);
+}
+
+// ── PIN SHEET TOGGLE ──
+let pinSheetOpen=false;
+function togglePinSheet(){
+  pinSheetOpen=!pinSheetOpen;
+  const sheet=document.getElementById('pin-sheet');
+  const chevron=document.getElementById('pin-sheet-chevron');
+  const btn=document.getElementById('btn-pin-sheet');
+
+  // nav card is independent from pins; do not change #map-nav-card here.
+
+  sheet.classList.toggle('open',pinSheetOpen);
+  btn?.classList.toggle('active-layer',pinSheetOpen);
+
+  // shift the map content so the sidebar does not overlay map elements
+  document.getElementById('screen-map')?.classList.toggle('sidebar-open',pinSheetOpen);
+
+  // Pins sheet is independent from the navigation card.
+  // (navigation card visibility is controlled by its own button + route state)
+
+
+  if(chevron)chevron.textContent=pinSheetOpen?'▼ Collapse':'▲ Expand';
+}
+
+// ── KEYBOARD ──
+document.addEventListener('keydown',e=>{
+  if(e.key!=='Enter')return;
+  if(document.activeElement?.id==='map-search-input'){searchMapPoint();return;}
+  if(currentScreen==='g2c')convertGrid();
+  else if(currentScreen==='c2g')convertGeo();
+  else if(currentScreen==='g2g')convertGridToGrid();
+});
+
+window.addEventListener('load',()=>{
+  persistAuthState(false);
+  appRoot.style.display = 'none';
+  if (authBanner) authBanner.style.display = 'none';
+  overlay.classList.remove('hidden');
+  overlay.style.display = 'flex';
+  setTimeout(()=>{
+    hideSplashScreen();
+    setTimeout(()=>document.getElementById('login-password')?.focus(),500);
+  },3000);
+  setNavStartMode('live');
+  setNavTravelMode('foot');
+  buildCompassDegreeMarks();
+  startCompassSensor();
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').catch(err=>console.warn('Service worker registration failed',err));
+  }
+  // Reference for topo popup positioning: GR 184589 · -2.18043°, 30.16537° (display as DMS)
+  const refLat=-2.18043;
+  const refLon=30.16537;
+  const latD=dec2dms(Math.abs(refLat));
+  const lonD=dec2dms(refLon);
+  const latStr=fmtDMS(latD.d,latD.m,latD.s,'S');
+  const lonStr=fmtDMS(lonD.d,lonD.m,lonD.s,'E');
+  const dEl=document.getElementById('topo-ref-dms');
+  if(dEl)dEl.textContent=`${latStr} · ${lonStr}`;
+});
+
+// Geolocation permission helpers
+function showMapPermHint(text,showButton=true){
+  const el=document.getElementById('map-perm-hint');
+  if(!el)return;el.style.display='inline-flex';document.getElementById('map-perm-text').textContent=text;const btn=document.getElementById('map-perm-action');btn.style.display=showButton?'inline-block':'none';
+  btn.onclick=()=>{
+    ensureUserLocation({quiet:false,centerOnFound:true,zoom:15});
+    el.style.display='none';
+  };
+}
+function hideMapPermHint(){const el=document.getElementById('map-perm-hint');if(el)el.style.display='none';}
+
+async function checkGeolocationPermissionAndRequest(){
+  if(!('geolocation' in navigator))return;
+  // If Permissions API available, check first
+  if(navigator.permissions && navigator.permissions.query){
+    try{
+      const p = await navigator.permissions.query({name:'geolocation'});
+      if(p.state==='granted'){ hideMapPermHint(); ensureUserLocation({quiet:true,centerOnFound:false}); }
+      else if(p.state==='prompt'){ hideMapPermHint(); ensureUserLocation({quiet:false,centerOnFound:false}); }
+      else if(p.state==='denied'){ showMapPermHint('Location access is blocked in your browser. Enable it in site settings.',false); }
+      p.onchange = ()=>{ checkGeolocationPermissionAndRequest(); };
+      return;
+    }catch(e){/* ignore and fallback */}
+  }
+  // Fallback: directly attempt to request location which will trigger prompt on supported hosts
+  try{ ensureUserLocation({quiet:false,centerOnFound:false}); hideMapPermHint(); }catch(e){}
+}
+
+// Service worker update notification
+if(navigator.serviceWorker){
+  navigator.serviceWorker.addEventListener('message',e=>{
+    if(e.data && e.data.type==='sw-activated'){
+      // show a small non-blocking toast with Reload button
+      const id='sw-update-toast'; if(document.getElementById(id))return;
+      const t=document.createElement('div'); t.id=id; t.style.cssText='position:fixed;left:50%;transform:translateX(-50%);bottom:16px;z-index:9999;padding:10px 12px;border-radius:10px;background:rgba(6,8,6,.98);border:1px solid rgba(57,255,106,.14);color:var(--accent);font-family:var(--mono);font-size:12px;display:flex;gap:10px;align-items:center;';
+      t.innerHTML=`App updated — <button id="sw-reload-btn" style="margin-left:8px;padding:6px 8px;border-radius:8px;background:transparent;border:1px solid rgba(57,255,106,.12);color:var(--accent);font-family:var(--mono);cursor:pointer">Reload</button>`;
+      document.body.appendChild(t);
+      document.getElementById('sw-reload-btn').onclick=()=>location.reload(true);
+    }
+  });
+}
+</script>
+</body>
+</html>

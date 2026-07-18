@@ -1,0 +1,5 @@
+- [ ] Make navigation card draggable by user on map screen.
+- [ ] Update CSS to allow dragging without breaking layout.
+- [ ] Add JS: pointer/touch handlers + save position in local state.
+- [ ] Ensure Pins and Nav are independent after drag.
+- [ ] Smoke test: open Nav card, drag it, close/reopen, verify still works.
